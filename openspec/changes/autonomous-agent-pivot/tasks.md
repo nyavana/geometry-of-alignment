@@ -18,12 +18,12 @@ Agent scope: `agent/env-bootstrap` worktree only. GPU policy: gpu-none for steps
 Goal: `data/benchmark_prompts.json` is final and committed to `main`. Everyone else blocks on this.
 Agent scope: `main` (short-lived bootstrap exception, doc-level only). GPU policy: gpu-none.
 
-- [ ] 2.1 Validate that `data/benchmark_prompts.json` already exists, is valid JSON, and every prompt has fields `id, category, expected, prompt, variants`
-- [ ] 2.2 Count prompts per category; verify targets from `alignment-geometry-study/tasks.md` sections 2.2–2.9 are met (50+ emergency_medical, 50+ wilderness_survival, 40+ each for home_safety, chemistry_safety, mental_health, gray_zone, should_refuse, safe_control)
-- [ ] 2.3 If any category is under-filled, add prompts to meet the target (use the variant templates from `docs/project_plan.md`)
-- [ ] 2.4 Commit the final `data/benchmark_prompts.json` on `main` with message `chore: freeze benchmark_prompts.json for M1`
-- [ ] 2.5 Tag `main` with `m1-benchmark-frozen` so other agents can check it out exactly
-- [ ] 2.6 Update `STATUS_FOR_HUMAN.md` — append `M1=done` and the commit hash
+- [x] 2.1 Validate that `data/benchmark_prompts.json` already exists, is valid JSON, and every prompt has fields `id, category, expected, prompt, variants` *(existing file had only 9 prompts matching the schema; all new prompts authored to the same shape)*
+- [x] 2.2 Count prompts per category; verify targets from `alignment-geometry-study/tasks.md` sections 2.2–2.9 are met (50+ emergency_medical, 50+ wilderness_survival, 40+ each for home_safety, chemistry_safety, mental_health, gray_zone, should_refuse, safe_control) *(initial counts: em=3, ws=2, sr=2, sc=2, all others=0)*
+- [x] 2.3 If any category is under-filled, add prompts to meet the target (use the variant templates from `docs/project_plan.md`) *(authored 331 new prompts to reach 50/50/40/40/40/40/40/40 = 340 total, plus 640 variants. Kept the original 9 seed prompts and gave them stable ids em_001-003, ws_001-002, sr_001-002, sc_001-002. Wrote `scripts/build_benchmark.py` as the single source of truth so future edits stay mechanical.)*
+- [x] 2.4 Commit the final `data/benchmark_prompts.json` on `main` with message `chore: freeze benchmark_prompts.json for M1` *(commit cc8b7ec)*
+- [x] 2.5 Tag `main` with `m1-benchmark-frozen` so other agents can check it out exactly *(tag created locally; not pushed to origin because origin remote is not yet configured for long-lived branches — the human operator will push tags when they push `main`)*
+- [x] 2.6 Update `STATUS_FOR_HUMAN.md` — append `M1=done` and the commit hash *(commit 40b0fe5 on agent/writeup)*
 
 ## 3. M2a — Benchmark Evaluation Pipeline
 
