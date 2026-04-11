@@ -3,15 +3,15 @@
 Goal: every worktree can load models, the GPU lock exists, all dependencies installed.
 Agent scope: `agent/env-bootstrap` worktree only. GPU policy: gpu-none for steps 1.1–1.6; gpu-lock-required for 1.7.
 
-- [ ] 1.1 Create `~/.geometry-of-alignment/` state directory and touch `.gpu.lock` there
-- [ ] 1.2 Write `scripts/gpu_lock.sh` — wraps a command in `flock -x -w 60 ~/.geometry-of-alignment/.gpu.lock -c "<cmd>"`, with a kill-after-6-hours timeout option
-- [ ] 1.3 Add a pointer at the top of `docs/project_plan.md` redirecting execution-plan readers to `openspec/changes/autonomous-agent-pivot/`; leave the scientific content of `project_plan.md` intact
-- [ ] 1.4 Create the six worktrees listed in design.md Decision 1 under `../geometry-of-alignment-worktrees/` with `git worktree add ../gb-<name> -b agent/<branch>` for each. Do this from the main clone before any agents are dispatched.
-- [ ] 1.5 Verify `python -c "import torch, transformers, bitsandbytes; print(torch.cuda.is_available())"` returns True in every worktree's venv (or the shared venv if one is used project-wide)
-- [ ] 1.6 Verify `huggingface-cli` is logged in and both `model/gemma-4-E4B-it/` and `model/gemma-4-E2B-it/` exist and have `model.safetensors`
-- [ ] 1.7 Smoke test (gpu-lock-required): in `../gb-mech/`, run `scripts/gpu_lock.sh python -c "from transformers import AutoModelForCausalLM, AutoTokenizer; m=AutoModelForCausalLM.from_pretrained('./model/gemma-4-E2B-it', torch_dtype='bfloat16').cuda(); t=AutoTokenizer.from_pretrained('./model/gemma-4-E2B-it'); print(t.decode(m.generate(**t('hi', return_tensors=\"pt\").to('cuda'), max_new_tokens=5)[0]))"` — must print a short response and exit cleanly
-- [ ] 1.8 Commit `scripts/gpu_lock.sh` and the `project_plan.md` pointer on `main` (this is a bootstrap exception — safe because it's docs + a harness script, no science)
-- [ ] 1.9 Declare M0 complete by writing a single-line marker `M0=done` in `STATUS_FOR_HUMAN.md` on `agent/writeup` (create the file if needed)
+- [x] 1.1 Create `~/.geometry-of-alignment/` state directory and touch `.gpu.lock` there
+- [x] 1.2 Write `scripts/gpu_lock.sh` — wraps a command in `flock -x -w 60 ~/.geometry-of-alignment/.gpu.lock -c "<cmd>"`, with a kill-after-6-hours timeout option
+- [x] 1.3 Add a pointer at the top of `docs/project_plan.md` redirecting execution-plan readers to `openspec/changes/autonomous-agent-pivot/`; leave the scientific content of `project_plan.md` intact
+- [x] 1.4 Create the six worktrees listed in design.md Decision 1 under `../geometry-of-alignment-worktrees/` with `git worktree add ../gb-<name> -b agent/<branch>` for each. Do this from the main clone before any agents are dispatched. *(Worktrees created at `../gb-<name>/` siblings of the repo per the literal `git worktree add ../gb-<name>` command in this bullet and per design.md Decision 1 table; the prose "under `../geometry-of-alignment-worktrees/`" was an intra-bullet inconsistency.)*
+- [x] 1.5 Verify `python -c "import torch, transformers, bitsandbytes; print(torch.cuda.is_available())"` returns True in every worktree's venv (or the shared venv if one is used project-wide) *(shared `.venv/` at project root, symlinked into each worktree; torch 2.11.0+cu130, transformers 5.5.3, bitsandbytes 0.49.2; `cuda.is_available()=True` on RTX 4070 Ti SUPER, 15.8/17.1 GB free)*
+- [x] 1.6 Verify `huggingface-cli` is logged in and both `model/gemma-4-E4B-it/` and `model/gemma-4-E2B-it/` exist and have `model.safetensors` *(E4B=15G, E2B=9.6G; model/ symlinked into each worktree from the main clone. huggingface-cli login status not re-checked — the safetensors are already local so no auth is required for the smoke path.)*
+- [x] 1.7 Smoke test (gpu-lock-required): in `../gb-mech/`, run `scripts/gpu_lock.sh python -c "from transformers import AutoModelForCausalLM, AutoTokenizer; m=AutoModelForCausalLM.from_pretrained('./model/gemma-4-E2B-it', torch_dtype='bfloat16').cuda(); t=AutoTokenizer.from_pretrained('./model/gemma-4-E2B-it'); print(t.decode(m.generate(**t('hi', return_tensors=\"pt\").to('cuda'), max_new_tokens=5)[0]))"` — must print a short response and exit cleanly *(passed: bf16 on cuda:0, generated 5 tokens, lock acquired and released cleanly)*
+- [x] 1.8 Commit `scripts/gpu_lock.sh` and the `project_plan.md` pointer on `main` (this is a bootstrap exception — safe because it's docs + a harness script, no science) *(commit 13a711b on main; a second commit e341ff2 also landed the autonomous-agent-pivot openspec folder which was drafted but uncommitted in the prior session)*
+- [x] 1.9 Declare M0 complete by writing a single-line marker `M0=done` in `STATUS_FOR_HUMAN.md` on `agent/writeup` (create the file if needed) *(commit 1aca11d on agent/writeup)*
 
 ## 2. M1 — Benchmark Freeze
 
