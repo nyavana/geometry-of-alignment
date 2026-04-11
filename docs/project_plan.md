@@ -1,3 +1,17 @@
+> **Execution model pivoted 2026-04-11.** The workload division below
+> ("Persons A/B/C/D", weekday GPU calendar, 4-week timeline) is retained
+> as historical context only. The current execution plan is an agent-
+> driven, worktree-per-workstream model with a mandatory human
+> verification gate before the paper phase. For the current workflow see:
+>
+> &nbsp;&nbsp;&nbsp;&nbsp;[`openspec/changes/autonomous-agent-pivot/`](../openspec/changes/autonomous-agent-pivot/)
+>
+> The **scientific content** of this document — category lists, prompt
+> templates, mechanistic hooks, SVD analyses, paper outline — remains
+> authoritative and is the library that `autonomous-agent-pivot` points
+> back into. Labels "Person A/B/C/D" are now just section names, not
+> ownership.
+
 # Project plan
 
 **Project**: The Geometry of Alignment: How Safety Lives and Dies in Modern LLMs  
