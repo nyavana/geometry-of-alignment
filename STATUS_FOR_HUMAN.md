@@ -16,3 +16,4 @@ Do not remove markers. Only append.
 ## Milestone markers
 
 M0=done  commit=13a711b  gpu_lock+project_plan_pointer+gitignore bootstrap on main; 6 worktrees created; gemma-4-E2B smoke test passed in gb-mech via scripts/gpu_lock.sh
+M1=done  commit=cc8b7ec  tag=m1-benchmark-frozen  benchmark expanded from 9 to 340 prompts (50+50+6x40) via scripts/build_benchmark.py; schema validated (unique ids, valid expected, non-empty prompts, should_refuse=refuse); 640 variants; 118 KB json
