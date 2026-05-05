@@ -6,15 +6,55 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Research project for EECS 6699 (Mathematics of Deep Learning, Columbia University) investigating where safety/refusal behavior lives in LLM weights, why abliteration (a rank-1 weight perturbation) can remove it, and whether selective de-alignment is possible (remove over-refusal on medical queries while keeping refusal on harmful ones).
 
-Primary models: Gemma 4 E4B-it (42 layers, dense, GPU via 8-bit quantization) and Qwen3.5-35B-A3B (MoE, CPU-only weight diff analysis).
+Primary model: Gemma 4 E4B-it (42 layers, dense, GPU via 8-bit quantization) for benchmark + mechanistic + abliteration. Comparative weight-diff phase compares the base against published Gemma 4 E4B uncensored variants (OBLITERATUS, TrevorJS) on CPU using safetensors arithmetic.
+
+## Worktrees & Shared Sidecar
+
+Development happens across multiple git worktrees that all sit as siblings under `/home/nyavana/columbia/6699/`:
+
+```
+/home/nyavana/columbia/6699/
+├── shared/                          # NOT a git repo — shared resources
+│   ├── model/                       # 25 GB model checkpoints (gemma-4-E2B-it, gemma-4-E4B-it)
+│   ├── .venv/                       # Python 3.12 environment, all requirements.txt installed
+│   ├── hf-cache/                    # HF_HOME target — Hugging Face downloads pooled here
+│   ├── results/<branch>/            # branch-scoped scratch outputs
+│   ├── docs/INSTRUCTIONS.md         # live shared notes (non-versioned)
+│   └── env.sh                       # source from any worktree
+├── geometry-of-alignment/           # main worktree (main branch)
+│   ├── model      -> ../shared/model    (symlink)
+│   └── .venv      -> ../shared/.venv    (symlink)
+└── gb-{ablit,bench,env,mech,paper,wdiff}/   # sibling worktrees, same symlinks
+```
+
+Symlinks `model` and `.venv` are excluded via `.git/info/exclude` (shared across all worktrees), so they never appear as untracked.
+
+### Activating in any worktree
+
+```bash
+source /home/nyavana/columbia/6699/shared/env.sh   # exports HF_HOME, TRANSFORMERS_CACHE, HF_DATASETS_CACHE, RESULTS_DIR
+source .venv/bin/activate                          # Python env via the symlink
+```
+
+`RESULTS_DIR` is auto-scoped to the current branch (e.g. `shared/results/agent/benchmark-eval`) so parallel agents don't trample each other. Existing modules still default to writing under each worktree's local `results/` (via their `--output` flags); use `$RESULTS_DIR` for new scripts and ad-hoc artifacts you don't want versioned per-worktree.
+
+### If recreating the venv from scratch
+
+The shared venv was built with `python3.12 -m venv` and `pip install -r requirements.txt`. `llama-cpp-python` requires a C/C++ toolchain and `cmake`:
+
+```bash
+pip install cmake
+CC=/usr/bin/gcc CXX=/usr/bin/g++ pip install -r requirements.txt
+```
 
 ## Running Modules
 
 All modules run as Python module invocations from the project root. There is no build system, test suite, or linter configured.
 
 ```bash
-# Install dependencies
-pip install -r requirements.txt
+# One-time per shell — activate shared env + venv (see Worktrees section above)
+source /home/nyavana/columbia/6699/shared/env.sh
+source .venv/bin/activate
 
 # Benchmark evaluation (llama.cpp backend)
 python -m src.benchmark.evaluate --backend llamacpp --model <gguf_path> --benchmark data/benchmark_prompts.json --output results/<model_name>/
@@ -44,13 +84,14 @@ python -m src.abliterate.ablation_study --model google/gemma-4-E4B-it --activati
 python -m src.abliterate.selective_safety --model google/gemma-4-E4B-it --benchmark data/benchmark_prompts.json --use-8bit
 
 # Weight diff (CPU-only, needs both model directories with safetensors)
-python -m src.weight_diff.compute_diff --original models/qwen-original/ --modified models/qwen-uncensored/ --output results/weight_diffs/qwen/
+# Primary published variant: OBLITERATUS abliteration of Gemma 4 E4B-it
+python -m src.weight_diff.compute_diff --original model/gemma-4-E4B-it/ --modified model/OBLITERATUS-gemma-4-E4B-it-OBLITERATED/ --output results/weight_diffs/gemma_obliteratus/
 
-# SVD analysis of weight diffs
-python -m src.weight_diff.svd_analysis --results results/weight_diffs/qwen/weight_diff_results.json
+# Secondary published variant: TrevorJS norm-preserving biprojection
+python -m src.weight_diff.compute_diff --original model/gemma-4-E4B-it/ --modified model/TrevorJS-gemma-4-E4B-it-uncensored/ --output results/weight_diffs/gemma_trevorjs/
 
-# MoE expert analysis
-python -m src.weight_diff.moe_expert_analysis --results results/weight_diffs/qwen/weight_diff_results.json
+# SVD analysis of weight diffs (run per variant)
+python -m src.weight_diff.svd_analysis --results results/weight_diffs/gemma_obliteratus/weight_diff_results.json
 ```
 
 ## Architecture
@@ -63,7 +104,7 @@ Four independent modules in `src/`, each runnable as a standalone pipeline:
 
 - **`src/abliterate/`** — Abliteration implementation. `abliterate.py` applies `W_new = W - alpha * d * (d^T @ W)` to `o_proj.weight` and `down_proj.weight` via `_project_out()`. `ablation_study.py` sweeps alpha (0-2.0), layer subsets (global-only, sliding-only, etc.), and includes random direction control. `selective_safety.py` computes category-specific refusal directions and tests removing medical over-refusal while keeping harmful-query refusal.
 
-- **`src/weight_diff/`** — CPU-based weight comparison. `compute_diff.py` loads safetensors, computes element-wise diffs with SVD rank analysis. `svd_analysis.py` visualizes modification ranks and per-layer changes. `moe_expert_analysis.py` maps which MoE experts/routers/shared-experts were modified in cracked Qwen models.
+- **`src/weight_diff/`** — CPU-based weight comparison across published Gemma 4 E4B abliterations. `compute_diff.py` loads safetensors, computes element-wise diffs with SVD rank analysis. `svd_analysis.py` visualizes modification ranks and per-layer changes, and supports cross-method overlays + refusal-direction cross-reference (cosine vs M2b refusal directions).
 
 ### Cross-module dependencies
 
@@ -88,5 +129,6 @@ Used throughout the codebase — verify against model config if models are updat
 ## Hardware Constraints
 
 - GPU: NVIDIA 4070 Ti Super 16GB — used for Gemma 4 E4B (8-bit quantization required)
-- CPU/RAM: 100GB DDR4 — used for Qwen3.5-35B weight diff analysis via safetensors
+- CPU/RAM: 100GB DDR4 — used for the comparative weight-diff phase against published Gemma 4 E4B variants (~17 GB safetensors per variant); fits comfortably alongside concurrent GPU work
 - Always pass `--use-8bit` for GPU-based Gemma experiments to stay within VRAM budget
+- Models live under `shared/model/` (25 GB), reached via the `model` symlink in each worktree — do not duplicate
