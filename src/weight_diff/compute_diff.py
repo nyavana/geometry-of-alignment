@@ -1,12 +1,12 @@
 """
-Compare weights between original and cracked/uncensored models.
+Compare weights between a base model and a published abliterated variant.
 Runs entirely on CPU using safetensors for memory-efficient loading.
 
 Usage:
     python -m src.weight_diff.compute_diff \
-        --original models/qwen-original/ \
-        --modified models/qwen-uncensored/ \
-        --output results/weight_diffs/qwen/
+        --original model/gemma-4-E4B-it/ \
+        --modified model/OBLITERATUS-gemma-4-E4B-it-OBLITERATED/ \
+        --output results/weight_diffs/gemma_obliteratus/
 """
 
 import torch

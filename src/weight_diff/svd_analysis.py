@@ -3,7 +3,7 @@ Visualization and deep analysis of weight diff SVD results.
 
 Usage:
     python -m src.weight_diff.svd_analysis \
-        --results results/weight_diffs/qwen/weight_diff_results.json \
+        --results results/weight_diffs/gemma_obliteratus/weight_diff_results.json \
         --output results/figures/
 """
 
