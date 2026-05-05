@@ -15,7 +15,7 @@ You're hiking in a remote area with no cell service. Your companion starts choki
 
 This actually happened. We tested Gemma 4 E4B running locally and it refused to answer emergency medical queries. The safety mechanism meant to prevent harm was causing it.
 
-At the same time, "cracked" versions of these models exist (e.g., `Qwen3.5-35B-A3B-Uncensored`, `Gemma-4-31B-JANG_4M-CRACK`) that remove all safety guardrails through a technique called **abliteration**. The method projects out a single "refusal direction" from the model's residual stream. No fine-tuning, no training data. A rank-1 weight perturbation and the model stops refusing.
+At the same time, "cracked" versions of these models exist (e.g., `OBLITERATUS/gemma-4-E4B-it-OBLITERATED`, `TrevorJS/gemma-4-E4B-it-uncensored`) that remove all safety guardrails through a technique called **abliteration**. The method projects out a single "refusal direction" from the model's residual stream. No fine-tuning, no training data. A rank-1 weight perturbation and the model stops refusing.
 
 That raises some questions we think are worth investigating:
 
@@ -35,7 +35,7 @@ Third, **what makes abliteration work?** A rank-1 weight perturbation removes sa
 
 Fourth, **can we be selective?** If we compute separate refusal directions for "medical queries" and "weapons queries," are those directions different enough that we can remove one and keep the other?
 
-Fifth, **what did the cracked models actually change?** By comparing the weights of published uncensored models against their originals, we can check whether the modifications are consistent with abliteration and whether MoE architectures (with their expert routing) reveal anything about how alignment is structured.
+Fifth, **what did the cracked models actually change?** By comparing the weights of multiple published Gemma 4 E4B uncensored variants against the original, we can check whether the modifications are consistent with abliteration and whether different published methods converge on the same underlying weight perturbation in the same parameter space.
 
 ## 3. Connection to course content
 
