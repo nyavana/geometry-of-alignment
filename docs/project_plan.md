@@ -1,16 +1,22 @@
-> **Execution model pivoted 2026-04-11.** The workload division below
-> ("Persons A/B/C/D", weekday GPU calendar, 4-week timeline) is retained
-> as historical context only. The current execution plan is an agent-
-> driven, worktree-per-workstream model with a mandatory human
-> verification gate before the paper phase. For the current workflow see:
+> **Execution model pivoted 2026-04-11; consolidated 2026-05-05.** The
+> workload division below ("Persons A/B/C/D", weekday GPU calendar,
+> 4-week timeline) is retained as historical context only. The Qwen3.5-35B-A3B
+> MoE weight-diff phase has been replaced with a comparative weight-diff
+> across published Gemma 4 E4B uncensored variants. For the current
+> workflow see:
 >
-> &nbsp;&nbsp;&nbsp;&nbsp;[`openspec/changes/autonomous-agent-pivot/`](../openspec/changes/autonomous-agent-pivot/)
+> &nbsp;&nbsp;&nbsp;&nbsp;[`openspec/changes/gemma-only-execution-plan/`](../openspec/changes/gemma-only-execution-plan/)
+>
+> The two predecessor changes (`alignment-geometry-study`, `autonomous-agent-pivot`)
+> are archived under `openspec/archive/`.
 >
 > The **scientific content** of this document — category lists, prompt
 > templates, mechanistic hooks, SVD analyses, paper outline — remains
-> authoritative and is the library that `autonomous-agent-pivot` points
-> back into. Labels "Person A/B/C/D" are now just section names, not
-> ownership.
+> authoritative *for sections that don't reference Qwen*. Anything in the
+> "Person D weight diff" sections below referring to Qwen, MoE experts,
+> the router, or the shared expert is **superseded** by section 7 of
+> the new change's `tasks.md`. Labels "Person A/B/C/D" are now just
+> section names, not ownership.
 
 # Project plan
 
@@ -35,8 +41,9 @@
 |-------|-------------|-------------|----------------|---------|
 | Gemma 4 E4B-it | ~4B effective, 42 layers | 7.5 GB | transformers + bitsandbytes 8-bit | B, C (GPU) |
 | Gemma 4 E2B-it | ~2B effective | 4.6 GB (8-bit) / 9.6 GB (BF16) | transformers BF16 | B, C (fast iteration) |
-| Qwen3.5-35B-A3B | 35B total, 3B active, 256 experts MoE | N/A (CPU) | safetensors on CPU | D (weight diff) |
-| Qwen3.5-35B-A3B-Uncensored | Same arch, abliterated | N/A (CPU) | safetensors on CPU | D (weight diff) |
+| OBLITERATUS/gemma-4-E4B-it-OBLITERATED | 42-layer dense, abliterated (whitened SVD + head surgery) | N/A (CPU) | bf16 safetensors on CPU | D (weight diff) |
+| TrevorJS/gemma-4-E4B-it-uncensored | 42-layer dense, abliterated (norm-preserving biprojection) | N/A (CPU) | bf16 safetensors on CPU | D (weight diff) |
+| HauhauCS/Gemma-4-E4B-Uncensored-HauhauCS-Aggressive | 42-layer dense, abliterated (GGUF only) | N/A | GGUF | D (behavioral eval only) |
 | All models (inference) | Various | Quantized | llama.cpp | A (benchmark eval) |
 
 ### Gemma 4 E4B-it architecture reference
@@ -558,6 +565,12 @@ Safe control:            ANSWER      ANSWER        ANSWER   <-- unchanged
 | 5-7 | Slides | Slides |
 
 ---
+
+> **Note (2026-05-05):** The remainder of the Person D section below is
+> historical. The Qwen MoE weight-diff workstream described here was
+> replaced with a comparative weight-diff across published Gemma 4 E4B
+> variants. See `openspec/changes/gemma-only-execution-plan/tasks.md`
+> section 7 for the live plan.
 
 ## Person D: weight diff forensics and paper integration
 
