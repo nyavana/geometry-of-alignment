@@ -1,7 +1,7 @@
 # Design: Gemma-only execution plan
 
 **Date:** 2026-05-05
-**Status:** Draft (brainstorming output, awaiting user review)
+**Status:** Approved (brainstorming complete; ready for implementation-plan generation)
 **Supersedes for execution purposes:** `openspec/changes/alignment-geometry-study/`, `openspec/changes/autonomous-agent-pivot/`
 
 ## Why
@@ -178,8 +178,8 @@ The following is the structural outline. The full `tasks.md` will follow the aut
 | Our own M2c abliteration fails on Gemma 4 due to RMSNorm/shared-K/V quirks | Medium-high | This is *itself* a result. Document the failure mode and reference OBLITERATUS's surgical fix as the published workaround. |
 | Up-front consolidation cost (more writing this session) | Certain | Front-loaded once; saves repeated cross-doc lookups for every subsequent agent dispatch |
 
-## Open questions
+## Resolved decisions (post-review)
 
-1. Should the new openspec change include the M0/M1 history at all, or treat them as fully archived predecessors? (Leaning: brief one-paragraph "Status at start of this change" referencing the M0/M1 commits, no task list.)
-2. Worktree naming: `agent/weight-diff` worktree was named for Qwen MoE work. Keep the name, or rename to `agent/comparative-diff`? (Leaning: keep the name — it still does weight diff, just on different models. Renaming costs a worktree recreation.)
-3. License audit: the OBLITERATUS card states base is Apache 2.0 and the derived weights inherit. TrevorJS and HauhauCS to be checked at download time. Not a design blocker, but the M3 tasks should include a license-check sub-task before committing any derivative artifacts.
+1. **M0/M1 inclusion:** include M0 and M1 task lists in the new change's `tasks.md`, with each item marked completed and annotated with its commit hash (e.g. `[x] 1.8 ... *(commit 13a711b on main)*`). They serve as reference for agents reading the new change cold; the task list reads as historical context, not work to do.
+2. **Worktree naming:** keep `agent/weight-diff` and the `../gb-wdiff/` worktree path. The work it does has changed; the name still describes the workstream accurately enough.
+3. **License audit:** explicit sub-task in M3 step 1 — verify each variant's license card before committing any derivative artifacts (paper figures, JSONs, etc.). OBLITERATUS card already confirms Apache 2.0 inheritance; TrevorJS and HauhauCS to be checked at download time.
