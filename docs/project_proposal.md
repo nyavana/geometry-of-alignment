@@ -56,10 +56,11 @@ And over-refusal is just a generalization failure. The model learned "refuse whe
 
 | Model | Type | Role | Runs on |
 |-------|------|------|---------|
-| Gemma 4 E4B-it | Dense, 42 layers, PLE | Primary mechanistic analysis (8-bit, 7.5GB VRAM) | GPU |
-| Gemma 4 E2B-it | Dense, PLE | Validation model (BF16, 9.6GB) | GPU |
-| Qwen3.5-35B-A3B | MoE, 256 experts | Weight diff analysis target | CPU (100GB RAM) |
-| Qwen3.5-35B-A3B-Uncensored | MoE, cracked | Reverse engineering target | CPU |
+| Gemma 4 E4B-it | Dense, 42 layers, PLE | Primary mechanistic analysis + abliteration target (8-bit, 7.5GB VRAM) | GPU |
+| Gemma 4 E2B-it | Dense, PLE | Cross-precision validation (BF16, 9.6GB) | GPU |
+| OBLITERATUS/gemma-4-E4B-it-OBLITERATED | Dense, published abliteration | Primary weight-diff target; benchmark eval | CPU + GPU (GGUF) |
+| TrevorJS/gemma-4-E4B-it-uncensored | Dense, published abliteration (norm-preserving biprojection) | Secondary weight-diff target; benchmark eval | CPU + GPU |
+| HauhauCS/Gemma-4-E4B-Uncensored-HauhauCS-Aggressive | Dense, published abliteration (GGUF only) | Behavioral comparison only | CPU (GGUF) |
 
 ### Gemma 4 E4B architecture (primary model)
 - 42 transformer layers: 35 sliding attention + 7 global attention
@@ -82,26 +83,26 @@ Hook into each of E4B's 42 layers via `register_forward_hook`. Collect residual 
 ### 5.4 Abliteration and selective safety (Person C)
 Reproduce abliteration from scratch: compute the refusal direction, project it out of `o_proj.weight` and `down_proj.weight`. Run ablation sweeps over alpha (0 to 2.0), layer subsets (global-only, sliding-only), and prompt count (10 to 200). Include a random-direction control. Then attempt selective safety: compute category-specific refusal directions and remove only the medical over-refusal.
 
-### 5.5 Weight diff analysis (Person D)
-Load Qwen3.5-A3B original and uncensored on CPU. Compute element-wise weight diffs, SVD rank analysis, per-layer Frobenius norms. For the MoE architecture: check which experts were modified, whether the router changed, and whether the shared expert was touched.
+### 5.5 Comparative weight diff analysis (Person D)
+Load base Gemma 4 E4B-it and two published abliterated variants (OBLITERATUS, TrevorJS) on CPU. Compute element-wise weight diffs, SVD rank analysis, per-layer Frobenius norms. Cross-method comparison: per-layer overlay of Frobenius norms across variants; cosine similarity between the variants' top-1 left singular vectors per modified parameter. Quantitative cross-reference: cosine similarity between weight-diff singular vectors and Section 5.3 refusal directions, layer by layer (same parameter space). Architectural-quirk handling: identify Gemma 4 shared K/V tensors (layers 24–41 reference layer 24's K/V) and de-duplicate in per-layer plots.
 
 ## 6. Work division and timeline
 
 | Week | Person A (Benchmark) | Person B (Mechanistic) | Person C (Abliteration) | Person D (Weight diff + Paper) |
 |------|---------------------|----------------------|------------------------|-------------------------------|
-| 1 | Build benchmark, set up llama.cpp | Build activation hooks, test on E2B | Implement abliteration, test on E2B | Download models, start weight diffs, start survey |
-| 2 | Run evals on all original models | Extract activations from E4B, compute directions | Apply abliteration to E4B, run sweeps | Complete weight diff and SVD analysis |
-| 3 | Eval abliterated models, analyze | Layer analysis, UMAP, cross-model validation | Selective safety experiments, capability tests | Cross-reference with B's directions, draft paper |
+| 1 | Build benchmark, set up llama.cpp | Build activation hooks, test on E2B | Implement abliteration, test on E2B | Download base + 3 published Gemma variants, start survey |
+| 2 | Run evals on all variants (incl. published abliterations) | Extract activations from E4B, compute directions | Apply abliteration to E4B, run sweeps | Complete per-variant weight diff + SVD; pre-flight shape checks |
+| 3 | Eval our own abliterated model | Layer analysis, UMAP, cross-precision validation | Selective safety experiments, capability tests | Cross-method comparison; quantitative cross-reference with B's directions; draft paper Section 7 |
 | 4 | Write Section 4, slides | Write Section 5, slides | Write Section 6, slides | Integrate paper, write Sections 1-3 and 7-9 |
 
 All work runs in parallel after the shared benchmark is created in the first few days.
 
 ## 7. Deliverables
 
-1. A 9-section research paper with a survey (RLHF, DPO, representation engineering, abliteration) and experimental results
-2. Presentation slides covering the emergency scenario, key results, and course connections
-3. Python codebase in `src/` with benchmark, mechanistic, abliterate, and weight_diff modules
-4. Benchmark prompt dataset and all experimental results in `data/` and `results/`
+1. A 9-section research paper with a survey (RLHF, DPO, representation engineering, abliteration including OBLITERATUS / Heretic / norm-preserving biprojection variants) and experimental results, including a Section 7 comparing published Gemma 4 E4B abliterations with our own
+2. Presentation slides covering the emergency scenario, key results (including the cross-method weight-diff comparison and the refusal-direction × singular-vector cross-reference), and course connections
+3. Python codebase in `src/` with benchmark, mechanistic, abliterate, and weight_diff modules (the latter rewritten to support cross-variant comparison)
+4. Benchmark prompt dataset and all experimental results in `data/` and `results/`, including per-variant weight-diff JSONs and the cross-method cosine table
 
 ## 8. Ethics
 
