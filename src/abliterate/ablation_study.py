@@ -109,7 +109,7 @@ def quick_evaluate(model, tokenizer, benchmark_path: str,
         with torch.no_grad():
             output_ids = model.generate(
                 input_ids, attention_mask=attention_mask,
-                max_new_tokens=256, temperature=0.1, do_sample=True,
+                max_new_tokens=128, temperature=0.1, do_sample=True,
             )
 
         response = tokenizer.decode(
