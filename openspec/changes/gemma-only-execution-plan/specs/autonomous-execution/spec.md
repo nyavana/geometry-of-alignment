@@ -34,7 +34,7 @@ Any code path that loads a model onto CUDA (including `transformers.AutoModel.fr
 - **THEN** the kernel SHALL release the flock automatically so the next agent can proceed without manual intervention
 
 ### Requirement: Agent dispatch contract
-Every agent dispatch prompt SHALL include: (1) absolute worktree path, (2) branch name, (3) a specific tasks.md section ID that bounds the agent's scope, (4) GPU policy tag, (5) commit-and-push protocol with commit-message format, (6) stop condition at section boundary.
+Every agent dispatch prompt SHALL include: (1) absolute worktree path, (2) branch name, (3) a specific tasks.md section ID that bounds the agent's scope, (4) GPU policy tag, (5) commit-and-push protocol with commit-message format, (6) stop condition at section boundary, (7) model selection (`claude-sonnet-4-6` for mechanical/well-specified work, `claude-opus-4-7` for tasks demanding novel decisions, ambiguity resolution, or writing).
 
 #### Scenario: Scope-bounded dispatch
 - **WHEN** an agent is dispatched to execute "tasks.md section 5 (abliteration)"
@@ -43,6 +43,10 @@ Every agent dispatch prompt SHALL include: (1) absolute worktree path, (2) branc
 #### Scenario: Commit after every sub-task
 - **WHEN** an agent checks off a sub-task in its scoped tasks.md section
 - **THEN** it SHALL create a commit with a message following `<type>: <description>` format and SHALL push the commit to the remote `agent/*` branch before starting the next sub-task
+
+#### Scenario: Model selected per task profile
+- **WHEN** the dispatcher selects a model for a section
+- **THEN** Sonnet 4.6 (`claude-sonnet-4-6`) SHALL be the default for mechanical work — running existing scripts, parameter sweeps, file/path shuffling, rebase/push housekeeping, well-specified evaluations (e.g., M2a 3.5–3.9, M2c 5.7 sweep, M3 7.7 weight-diff runs); Opus 4.7 (`claude-opus-4-7`) SHALL be the default where the task demands judgment calls or prose — interpreting M2b mechanistic results, writing the Gemma-quirk discussion in M2c 5.6, designing the M3 7.10 cross-reference, all of M5 (paper + slides). Per-dispatch overrides SHALL be recorded with a one-line rationale in the dispatch prompt.
 
 ### Requirement: Artifact-gated milestones
 The project SHALL progress through milestones M0 through M5 without wall-clock deadlines. Each milestone SHALL be declared complete only when the listed artifacts exist on disk and the listed tasks are checked off.

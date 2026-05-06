@@ -144,6 +144,15 @@ Used throughout the codebase — verify against model config if models are updat
 - Always pass `--use-8bit` for GPU-based Gemma experiments to stay within VRAM budget
 - Models live under `shared/model/` (25 GB), reached via the `model` symlink in each worktree — do not duplicate
 
+## Subagent model routing
+
+When dispatching subagents to keep the main thread's context clean, choose the model by task profile rather than per-section convention. Two models in rotation:
+
+- **`claude-sonnet-4-6` (default for mechanical work)** — running existing scripts end-to-end, parameter sweeps, file/path shuffling, rebase + push housekeeping, well-specified evaluation runs. Examples from the execution plan: M2a 3.5–3.9 (per-model benchmark runs), M2c 5.7 (alpha/layer-subset sweep ensemble), M3 7.7 (weight-diff runs once `--strict` mode is set), M3 7.8 (SVD analysis).
+- **`claude-opus-4-7` (default for judgment + writing)** — tasks that require interpreting noisy results, deciding between approaches, handling Gemma 4 architectural quirks, or producing prose. Examples: M2b 4.5–4.9 (signal-strength interpretation, peak-layer call), M2c 5.6 (deciding whether incomplete refusal removal becomes a paper finding), M2c 5.10 (selective-safety design + threshold tuning), M3 7.10 (cross-reference design between refusal directions and singular vectors), all of M4 (`STATUS_FOR_HUMAN.md`) and M5 (paper + slides).
+
+The dispatch contract field `(7) model` (per `openspec/.../specs/autonomous-execution/spec.md` and `tasks.md` preamble) records the choice on every dispatch. When you override the default for a section, add a one-line rationale in the dispatch prompt so a later replay can see why.
+
 ## Documenting unresolvable issues
 
 When you hit a problem that isn't quickly fixable or workable around — environment or dependency conflicts, model-loading failures, agent-dispatch race conditions, anything that would block the next step — drop a short markdown note under `docs/issues/` (create the directory if it doesn't exist). Capture: symptom, what you tried, what you observed, and either the eventual fix or the open question that's still blocking. This gives the next session (or operator) a starting point and prevents re-walking the same dead end.

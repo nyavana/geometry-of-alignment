@@ -2,7 +2,7 @@
 
 This is the single source of truth for milestones M0–M5 of the project. M0 and M1 are complete (history retained for reference). M2–M5 are the live workstreams.
 
-**Dispatch contract** (carried forward from `autonomous-agent-pivot`): every agent dispatch SHALL include (1) absolute worktree path, (2) branch name, (3) a specific section ID from this file, (4) GPU policy, (5) commit-and-push protocol, (6) stop condition at section boundary.
+**Dispatch contract** (carried forward from `autonomous-agent-pivot`): every agent dispatch SHALL include (1) absolute worktree path, (2) branch name, (3) a specific section ID from this file, (4) GPU policy, (5) commit-and-push protocol, (6) stop condition at section boundary, (7) model (`claude-sonnet-4-6` for mechanical/well-specified tasks; `claude-opus-4-7` for tasks that demand novel decisions, ambiguity resolution, or writing — see CLAUDE.md "Subagent model routing" for the default mapping per section).
 
 **Environment activation** (every dispatched agent's first commands): `source /home/nyavana/columbia/6699/shared/env.sh && source .venv/bin/activate`. Without this, `python` is not on PATH.
 
