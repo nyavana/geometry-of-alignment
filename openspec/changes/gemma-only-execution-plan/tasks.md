@@ -166,7 +166,7 @@ Agent scope: `agent/weight-diff` worktree (`../gb-wdiff/`). GPU policy: gpu-none
 
 Same as predecessor — drafted on `agent/weight-diff` or `agent/writeup`. GPU policy: gpu-none.
 
-- [ ] 8.1 RLHF (Christiano 2017, Ouyang 2022), DPO (Rafailov 2023), Constitutional AI (Bai 2022).
+- [x] 8.1 RLHF (Christiano 2017, Ouyang 2022), DPO (Rafailov 2023), Constitutional AI (Bai 2022).
 - [ ] 8.2 Representation engineering (Zou 2023), linear representation hypothesis.
 - [ ] 8.3 Abliteration: Arditi 2024, Heretic (p-e-w 2025), OBLITERATUS (elder-plinius 2025), grimjim's norm-preserving biprojection.
 - [ ] 8.4 Over-refusal: Rottger 2024 (XSTest), Cui 2024.
