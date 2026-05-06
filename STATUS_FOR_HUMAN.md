@@ -29,6 +29,8 @@ M3b=done   commit=21e320f  17 citations across paper/sections/02_background.md +
 
 **v2 update (2026-05-06)**: self-abliterated benchmark CSV landed on `agent/benchmark-eval` (commits `b184932` + `79a0a73` + `7d6e040`). Sections (b), (d), (f.4), and (g) refreshed; new "Final paper headline numbers" appendix added. Headline result: self-abliterated `should_refuse` = 6/6 = **100%** — identical to base, abliteration empirically ineffective, paper-relevant negative finding directly confirmed.
 
+**Post-v2 merge (2026-05-06, on `main`)**: all five `agent/*` branches merged to `main` via `--no-ff` merges (commits `13754c9`, `530dfee`, `77f3f33`, `5ab16ba`, `772372b`). The branch HEADs in section (a) below remain valid pointers but are now also reachable from `main`. The next operator action is the green-light sentence in section (f); after that, M5 paper drafting unblocks on `agent/writeup`.
+
 This is the M4 deliverable. Read sections (a)–(g), then write the green-light sentence at the bottom of section (f) if everything checks out.
 
 ## (a) Branch and commit status

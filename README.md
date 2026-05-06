@@ -16,13 +16,15 @@ possible.
 2. **Where does refusal live?** Which layers and subspaces of the residual
    stream encode the refusal direction, and what dimensionality does it
    occupy?
-3. **Why is abliteration so effective?** What makes a single rank-1 weight
-   perturbation enough to remove refusal behavior?
+3. **Is rank-1 abliteration universally effective, and if not, why?** Recent
+   work reports the standard mean-diff recipe fails on certain post-2024
+   architectures (Gemma 4 in particular). What does that look like
+   empirically, and what does it tell us about the geometry of refusal?
 4. **Can over-refusal be removed selectively?** Is it possible to keep refusal
    on harmful queries while eliminating refusal on benign-but-flagged ones?
 5. **What do "uncensored" model releases actually change?** How do published
    uncensored variants differ from their original checkpoints at the
-   weight-diff level?
+   weight-diff level, and do they share a common modification subspace?
 
 ## Models Studied
 
@@ -183,8 +185,44 @@ python -m src.weight_diff.svd_analysis \
 
 ## Status
 
-Work in progress as part of the EECS 6699 final project. See `docs/project_plan.md`
-for the full plan and `docs/project_proposal.md` for the proposal.
+Experimental work for the EECS 6699 final project is complete (M0–M4); paper
+write-up (M5) is the next phase. See `STATUS_FOR_HUMAN.md` at the repo root
+for the operator-review status doc with all headline numbers, figure paths,
+and verification checklist; `docs/project_plan.md` for the full execution
+plan; `docs/project_proposal.md` for the original proposal.
+
+### Headline findings
+
+- **Refusal is rank-1 in activations, but not in weights.** M2b shows that
+  the activation-derived refusal direction is effectively rank-1 (top-1 PC
+  captures 86.6% of |Δμ|² at the peak band L4–L17, peak at L15 with Cohen's
+  d 2.87). M3 shows the *weight* diffs that produce uncensored behavior are
+  not: OBLITERATUS edits are multi-rank (median rank_95 = 6) and TrevorJS
+  edits are pure rank-1 norm-preserving biprojections — the two methods
+  modify nearly orthogonal subspaces (median |cos| = 0.08) and neither's
+  top-1 singular vector aligns with M2b's activation direction (median
+  |cos| ≈ 0.04).
+- **Standard rank-1 mean-diff abliteration is empirically ineffective on
+  Gemma 4 E4B 8-bit.** The M2c sweep (α∈[0, 2.0], 9 layer subsets, random
+  control) leaves refusal flat at 30–35% on the stratified subset; the
+  self-abliterated model's `should_refuse` rate is 100% (unchanged from
+  base). This confirms predicted RMSNorm + shared-K/V resistance and
+  constitutes a clean negative finding: refusal admits no clean rank-1
+  fix in this architecture even though the activation direction itself
+  looks rank-1.
+- **Selective safety geometry is clean.** Per-category refusal directions
+  (emergency_medical, wilderness_survival, home_safety, chemistry_safety,
+  mental_health) form a tight +0.93 pairwise cluster and are orthogonal to
+  the `should_refuse` direction (mean cosine −0.015). The geometry permits
+  selective abliteration even though the magnitude-side constraint above
+  blocks it from working with the standard rank-1 recipe.
+- **Over-refusal hypothesis only weakly confirmed at the base level.**
+  Base Gemma 4 E4B GGUF refuses only 2% of `emergency_medical` prompts
+  (vs 100% of `should_refuse`); E2B BF16 is slightly more conservative
+  (12% / 95.2%). The "models refuse helpful medical questions" trope is
+  not a strong feature of the Gemma 4 family on this benchmark.
+
+See `STATUS_FOR_HUMAN.md` for the full table and source-CSV citations.
 
 ## License
 
