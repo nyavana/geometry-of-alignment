@@ -36,7 +36,7 @@ source /home/nyavana/columbia/6699/shared/env.sh   # exports HF_HOME, TRANSFORME
 source .venv/bin/activate                          # Python env via the symlink
 ```
 
-`RESULTS_DIR` is auto-scoped to the current branch (e.g. `shared/results/agent/benchmark-eval`) so parallel agents don't trample each other. Existing modules still default to writing under each worktree's local `results/` (via their `--output` flags); use `$RESULTS_DIR` for new scripts and ad-hoc artifacts you don't want versioned per-worktree.
+`RESULTS_DIR` is auto-scoped to the current branch (e.g. `shared/results/agent/benchmark-eval`) so parallel agents don't trample each other. Per the gemma-only execution plan, `$RESULTS_DIR` is the canonical handoff target for cross-branch artifacts: M2b writes `refusal_directions.pt` there for M2c and M3 to consume; M2a writes per-model evaluation results there for M4 to aggregate. Existing modules' `--output` flag still accepts any path — pass `$RESULTS_DIR/...` to land artifacts in the shared, non-versioned location, or a worktree-local `results/` path for redundant in-repo copies (the `.gitignore` allowlist permits the small handoff files).
 
 ### If recreating the venv from scratch
 
@@ -52,7 +52,7 @@ Launch it with whatever GGUF you want to evaluate:
 llama-server -m path/to/model.gguf -ngl 99 --host 127.0.0.1 --port 8088
 ```
 
-(Port 8088, not the conventional 8080 — Windows-side WSL2 already binds 8080 on this host. `evaluate.py`'s default is still 8080, so pass `--server-url http://127.0.0.1:8088` when calling it.)
+(Port 8088, not the conventional 8080 — Windows-side WSL2 already binds 8080 on this host. `evaluate.py`'s `--server-url` default is also 8088 to match.)
 
 The benchmark script then sends OpenAI-compatible chat completions to that endpoint.
 
@@ -140,6 +140,12 @@ Used throughout the codebase — verify against model config if models are updat
 ## Hardware Constraints
 
 - GPU: NVIDIA 4070 Ti Super 16GB — used for Gemma 4 E4B (8-bit quantization required)
-- CPU/RAM: 100GB DDR4 — used for the comparative weight-diff phase against published Gemma 4 E4B variants (~17 GB safetensors per variant); fits comfortably alongside concurrent GPU work
+- CPU/RAM: ~46 GB physical + 12 GB swap (WSL2 default — host has more, but the WSL2 instance is capped). Each `compute_diff.py` run holds both fp32 state-dicts in memory and peaks around 32–35 GB, so single-variant runs fit comfortably; **two parallel weight-diff runs do not fit** — run M3 7.7 sequentially across OBLITERATUS and TrevorJS.
 - Always pass `--use-8bit` for GPU-based Gemma experiments to stay within VRAM budget
 - Models live under `shared/model/` (25 GB), reached via the `model` symlink in each worktree — do not duplicate
+
+## Documenting unresolvable issues
+
+When you hit a problem that isn't quickly fixable or workable around — environment or dependency conflicts, model-loading failures, agent-dispatch race conditions, anything that would block the next step — drop a short markdown note under `docs/issues/` (create the directory if it doesn't exist). Capture: symptom, what you tried, what you observed, and either the eventual fix or the open question that's still blocking. This gives the next session (or operator) a starting point and prevents re-walking the same dead end.
+
+Naming: `docs/issues/<yyyy-mm-dd>-<short-slug>.md` (e.g. `2026-05-06-bnb-cuda-version-skew.md`). Keep each note self-contained; if a fix lands later, append a short "Resolved" line rather than deleting the note — the failure-mode record stays useful.

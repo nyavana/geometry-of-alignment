@@ -32,7 +32,7 @@ This change owns six capabilities, all defined as spec deltas under `specs/`:
 
 ## Impact
 
-- **Compute**: GPU (NVIDIA 4070 Ti Super, 16 GB) for M2 (Gemma 4 E4B 8-bit, ~7.5 GB VRAM); CPU + 100 GB RAM for M3 (~17 GB-per-variant Gemma safetensors weight diff). M3 runs concurrently with M2 — no GPU contention.
+- **Compute**: GPU (NVIDIA 4070 Ti Super, 16 GB) for M2 (Gemma 4 E4B 8-bit, ~7.5 GB VRAM); CPU + ~46 GB physical RAM (WSL2-capped) + 12 GB swap for M3 (~17 GB-per-variant Gemma safetensors weight diff; peaks ~32–35 GB per run). M3 runs concurrently with M2 — no GPU contention. Variant diffs run sequentially, not in parallel, since two simultaneous runs (~68 GB combined) exceed available RAM.
 - **Models**: `google/gemma-4-E4B-it` (base), `google/gemma-4-E2B-it` (validation), `OBLITERATUS/gemma-4-E4B-it-OBLITERATED` (safetensors + GGUF), `TrevorJS/gemma-4-E4B-it-uncensored` (bf16 safetensors), `HauhauCS/Gemma-4-E4B-Uncensored-HauhauCS-Aggressive` (GGUF). No MoE models.
 - **Dependencies**: `safetensors`, `torch`, `transformers`, `bitsandbytes` in `requirements.txt`; `gguf` pinned to llama.cpp's git tree because pypi releases lag (the upstream `convert_hf_to_gguf.py` references symbols like `MODEL_ARCH.GEMMA4` that aren't in pypi yet). `llama-cpp-python` is removed; the GGUF backend now talks HTTP to upstream llama.cpp's `llama-server`, built from source into `shared/llama.cpp-cuda/` against `apt install nvidia-cuda-toolkit` (~2.5 GB, host-only) and surfaced through `shared/env.sh`.
 - **Disk**: ~25 GB for base + E2B (existing) + ~34 GB for OBLITERATUS + TrevorJS safetensors + ~5 GB for HauhauCS GGUF. Pre-flight `df -h` check in M3 step 1 verifies budget.

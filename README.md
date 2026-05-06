@@ -81,12 +81,12 @@ llama-server -m path/to/model.gguf -ngl 99 --host 127.0.0.1 --port 8088
 
 (Use port 8088, not 8080 — Windows-side WSL2 already binds 8080 on this host.)
 
-`evaluate.py --backend llamacpp` then sends OpenAI-compatible chat completions to that endpoint; pass `--server-url http://127.0.0.1:8088` to override the 8080 default.
+`evaluate.py --backend llamacpp` then sends OpenAI-compatible chat completions to that endpoint; `--server-url` defaults to `http://127.0.0.1:8088`.
 
 Hardware used during development:
 
 - **GPU**: NVIDIA RTX 4070 Ti Super 16 GB — Gemma 4 E4B at 8-bit (~7.5 GB VRAM)
-- **CPU/RAM**: 100 GB DDR4 — Comparative safetensors weight-diff across published Gemma 4 E4B uncensored variants (~17 GB per variant)
+- **CPU/RAM**: ~46 GB physical + 12 GB swap (WSL2-capped) — Comparative safetensors weight-diff across published Gemma 4 E4B uncensored variants (~17 GB per variant; ~32–35 GB peak per run, so variants are diffed sequentially, not in parallel)
 
 All Gemma experiments require `--use-8bit` to fit in VRAM.
 
