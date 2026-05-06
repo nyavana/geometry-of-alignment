@@ -171,19 +171,24 @@ def main():
     with open(args.benchmark) as f:
         benchmark = json.load(f)
 
-    refuse_prompts = [p["prompt"] for p in benchmark["prompts"]
-                      if p["category"] == "should_refuse"]
-    comply_prompts = [p["prompt"] for p in benchmark["prompts"]
-                      if p["category"] == "safe_control"]
+    # Refuse class: explicit should_refuse + the over-refuse categories that
+    # models tend to refuse despite being expected-comply. Both produce
+    # refusal-like activations; the per-prompt metadata persists category so
+    # M2c task 5.12 can slice category-specific directions without
+    # re-running GPU forward passes.
+    over_refuse_categories = {"emergency_medical", "wilderness_survival",
+                              "home_safety", "chemistry_safety", "mental_health"}
 
-    # Also include expected-comply categories that models tend to over-refuse
-    over_refuse_categories = ["emergency_medical", "wilderness_survival",
-                              "home_safety", "chemistry_safety", "mental_health"]
-    additional_refuse = [p["prompt"] for p in benchmark["prompts"]
-                         if p["category"] in over_refuse_categories]
-    # These are prompts the model SHOULD comply with but may refuse —
-    # we add them to the refuse set if they actually get refused
-    # For initial direction computation, use the clear-cut categories
+    refuse_records, refuse_prompts = [], []
+    comply_records, comply_prompts = [], []
+    for p in benchmark["prompts"]:
+        record = {"prompt_id": p["id"], "category": p["category"], "expected": p["expected"]}
+        if p["category"] == "should_refuse" or p["category"] in over_refuse_categories:
+            refuse_records.append(record)
+            refuse_prompts.append(p["prompt"])
+        elif p["category"] == "safe_control":
+            comply_records.append(record)
+            comply_prompts.append(p["prompt"])
 
     print(f"Refuse prompts: {len(refuse_prompts)}")
     print(f"Comply prompts: {len(comply_prompts)}")
@@ -212,6 +217,14 @@ def main():
     torch.save(refuse_acts, output_dir / "refuse_activations.pt")
     torch.save(comply_acts, output_dir / "comply_activations.pt")
     print(f"\nSaved activations to {output_dir}")
+
+    # Save per-prompt metadata (row index in {refuse,comply}_activations.pt
+    # aligns with list index in metadata["refuse"] / metadata["comply"]).
+    metadata = {"refuse": refuse_records, "comply": comply_records}
+    with open(output_dir / "prompt_metadata.json", "w") as f:
+        json.dump(metadata, f, indent=2)
+    print(f"Saved prompt metadata: "
+          f"{len(refuse_records)} refuse rows, {len(comply_records)} comply rows")
 
     # Compute and save refusal directions
     directions = compute_refusal_directions(refuse_acts, comply_acts)

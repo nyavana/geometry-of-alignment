@@ -81,7 +81,7 @@ Agent scope: `agent/mechanistic-analysis` worktree (`../gb-mech/`). GPU policy: 
 
 - [ ] 4.1 In `../gb-mech/`, rebase onto `m1-benchmark-frozen`.
 - [ ] 4.2 Verify `src/mechanistic/{extract_activations.py,layer_analysis.py,visualize.py}` and the `ActivationCollector` class. Smoke test on E2B BF16 with 10 prompts inside `scripts/gpu_lock.sh`.
-- [ ] 4.3 Full activation extraction on Gemma 4 E4B 8-bit: ~200 should_refuse + over-refused → `results/activations/refuse_activations.pt`; ~200 safe_control + should-comply → `results/activations/comply_activations.pt`.
+- [ ] 4.3 Full activation extraction on Gemma 4 E4B 8-bit: refuse-class (`should_refuse` + the five over-refuse categories `emergency_medical`, `wilderness_survival`, `home_safety`, `chemistry_safety`, `mental_health`) → `results/activations/refuse_activations.pt`; comply-class (`safe_control`) → `results/activations/comply_activations.pt`. Also write `results/activations/prompt_metadata.json` with the per-row mapping (`prompt_id`, `category`, `expected`) so M2c 5.12 can slice category-specific subsets without re-extracting on the GPU.
 - [ ] 4.4 Compute refusal directions per layer via mean-diff → `results/activations/refusal_directions.pt`. **CHECKPOINT — push immediately on completion. This is the M2b artifact that unblocks M2c task 5.4 and M3 task 7.10. Do not bundle 4.5–4.9 into the same commit.**
 - [ ] 4.5 Signal-strength + sliding/global comparison → `results/figures/signal_vs_layer.png`.
 - [ ] 4.6 PCA rank analysis per layer → `results/figures/pca_variance_per_layer.png`.
@@ -108,7 +108,7 @@ Dependency: M2b task 4.4 (refusal directions exist) must be complete before 5.4 
 - [ ] 5.9 Prompt-count sweep: [10, 25, 50, 100, 200] pairs. → `results/ablation_results/prompt_count_sweep.json`.
 - [ ] 5.10 Random-direction control. → `results/ablation_results/random_direction_control.json`.
 - [ ] 5.11 Capability preservation: MMLU + GSM8K subsets on original vs abliterated. → `results/ablation_results/capability_preservation.json`.
-- [ ] 5.12 Category-specific refusal directions (emergency_medical, wilderness_survival, should_refuse). Pairwise cosine similarity at each layer.
+- [ ] 5.12 Category-specific refusal directions: load `results/activations/refuse_activations.pt` + `prompt_metadata.json` (from M2b 4.3), slice rows by `category` (`emergency_medical`, `wilderness_survival`, `should_refuse`), and compute each category's direction against the `safe_control` baseline. NO re-extraction on the GPU. Pairwise cosine similarity at each layer.
 - [ ] 5.13 Selective abliteration: remove medical refusal direction only; eval over-refusal on medical (target: <10%) + refusal on should_refuse (target: >80%).
 - [ ] 5.14 Figures: `results/figures/{alpha_sweep.png,layer_subset_comparison.png,selective_safety_table.md}`.
 - [ ] 5.15 Hand-off: notify in commit message that abliterated models are ready for section 6 below.

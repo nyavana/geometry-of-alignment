@@ -11,6 +11,10 @@ The system SHALL hook into each of the 42 transformer layers of Gemma 4 E4B-it v
 - **WHEN** a forward hook captures activations
 - **THEN** the captured tensor SHALL be detached and moved to CPU before storage, and the hook SHALL clear previous activations before each new forward pass
 
+#### Scenario: Per-prompt category metadata persisted
+- **WHEN** activations are saved to disk
+- **THEN** a sibling `prompt_metadata.json` SHALL record, for each prompt index in the activation tensor, the benchmark `prompt_id`, `category`, and `expected` fields, so downstream consumers (e.g., selective-safety category-specific direction computation) can slice the saved activations by category without re-running forward passes on the GPU
+
 ### Requirement: Refusal direction computation
 The system SHALL compute the refusal direction at each layer as the normalized mean difference between refuse-class and comply-class activations.
 
