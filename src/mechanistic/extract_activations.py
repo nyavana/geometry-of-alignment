@@ -79,14 +79,41 @@ class ActivationCollector:
         return hook
 
     def register_hooks(self):
-        """Register forward hooks on all transformer layers."""
-        # For Gemma 4, layers are at model.model.layers
-        # IMPORTANT: verify this path by running print(model) first
-        layers = self.model.model.layers
+        """Register forward hooks on all transformer text layers.
+
+        Gemma 4 (multimodal CausalLM wrapper) places the decoder stack at
+        ``model.model.language_model.layers`` because the top-level
+        ``model.model`` is the multimodal `Gemma4Model` containing
+        ``vision_tower``, ``audio_tower``, and the text ``language_model``.
+        Older single-modality LLMs (Llama-style) use ``model.model.layers``.
+        Try both, in order, so this collector works across architectures.
+        """
+        candidate_paths = [
+            ("model", "model", "language_model", "layers"),  # Gemma 4
+            ("model", "model", "layers"),                    # Llama-style
+            ("model", "layers"),                             # bare TextModel
+        ]
+        layers = None
+        used_path = None
+        for path in candidate_paths:
+            obj = self
+            try:
+                for attr in path:
+                    obj = getattr(obj, attr)
+                layers = obj
+                used_path = ".".join(path)
+                break
+            except AttributeError:
+                continue
+        if layers is None:
+            raise AttributeError(
+                "Could not locate transformer decoder layers on this model. "
+                "Tried paths: " + ", ".join(".".join(p) for p in candidate_paths)
+            )
         for idx, layer in enumerate(layers):
             hook = layer.register_forward_hook(self._hook_fn(idx))
             self.hooks.append(hook)
-        print(f"Registered hooks on {len(self.hooks)} layers")
+        print(f"Registered hooks on {len(self.hooks)} layers (via {used_path})")
 
     def get_activations(self) -> dict:
         """Return collected activations."""
