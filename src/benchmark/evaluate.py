@@ -37,13 +37,19 @@ from src.benchmark.classify_refusal import classify_refusal
 
 def evaluate_with_llamacpp(server_url: str, model_name: str,
                            benchmark_path: str, output_path: str,
-                           request_timeout: float = 300.0) -> list[dict]:
+                           request_timeout: float = 300.0,
+                           limit: int = None,
+                           base_only: bool = False) -> list[dict]:
     """
     Evaluate a model served by llama-server (upstream llama.cpp) on the benchmark.
 
     The server must already be running and have a GGUF model loaded; the `model_name`
     argument is sent in the OpenAI-compatible request payload as a label only — the
     server uses whichever model was loaded with -m at launch.
+
+    Args:
+        limit: if set, evaluate only the first N prompts (useful for smoke tests).
+        base_only: if True, skip variants and only evaluate the base prompt (variant_idx=0).
     """
     import requests
 
@@ -52,22 +58,35 @@ def evaluate_with_llamacpp(server_url: str, model_name: str,
     with open(benchmark_path) as f:
         benchmark = json.load(f)
 
+    prompts = benchmark["prompts"]
+    if limit is not None:
+        prompts = prompts[:limit]
+
     results = []
 
-    for prompt_entry in tqdm(benchmark["prompts"], desc="Evaluating"):
-        prompts_to_test = [prompt_entry["prompt"]] + prompt_entry.get("variants", [])
+    for prompt_entry in tqdm(prompts, desc="Evaluating"):
+        if base_only:
+            prompts_to_test = [prompt_entry["prompt"]]
+        else:
+            prompts_to_test = [prompt_entry["prompt"]] + prompt_entry.get("variants", [])
 
         for variant_idx, prompt_text in enumerate(prompts_to_test):
             payload = {
                 "model": model_name,
                 "messages": [{"role": "user", "content": prompt_text}],
-                "max_tokens": 512,
+                "max_tokens": 2048,
                 "temperature": 0.1,
             }
 
             response = requests.post(endpoint, json=payload, timeout=request_timeout)
             response.raise_for_status()
-            response_text = response.json()["choices"][0]["message"]["content"]
+            resp_json = response.json()
+            message = resp_json["choices"][0]["message"]
+            # Gemma 4 can return an empty "content" when extended thinking uses
+            # all tokens; fall back to "reasoning_content" so we don't mis-classify
+            # real responses as refusals.  If both are empty, the model truly
+            # produced no output and we treat that as a soft-refuse.
+            response_text = message.get("content") or message.get("reasoning_content", "")
             is_refusal = classify_refusal(response_text)
 
             results.append({
@@ -92,33 +111,57 @@ def evaluate_with_llamacpp(server_url: str, model_name: str,
 # ──────────────────────────────────────────────
 
 def evaluate_with_transformers(model, tokenizer, benchmark_path: str,
-                               output_path: str) -> list[dict]:
+                               output_path: str,
+                               limit: int = None,
+                               base_only: bool = False) -> list[dict]:
     """
     Evaluate a transformers model (e.g., after abliteration).
     Accepts pre-loaded model and tokenizer objects.
+
+    Args:
+        limit: if set, evaluate only the first N prompts (useful for smoke tests).
+        base_only: if True, skip variants and only evaluate the base prompt.
     """
     import torch
 
     with open(benchmark_path) as f:
         benchmark = json.load(f)
 
+    prompts = benchmark["prompts"]
+    if limit is not None:
+        prompts = prompts[:limit]
+
     results = []
 
-    for prompt_entry in tqdm(benchmark["prompts"], desc="Evaluating"):
+    for prompt_entry in tqdm(prompts, desc="Evaluating"):
         prompt_text = prompt_entry["prompt"]
 
         messages = [{"role": "user", "content": prompt_text}]
-        input_ids = tokenizer.apply_chat_template(
+        template_output = tokenizer.apply_chat_template(
             messages, return_tensors="pt", add_generation_prompt=True
-        ).to(model.device)
+        )
+
+        # Gemma 4 is a multimodal model — apply_chat_template can return a
+        # BatchEncoding dict rather than a raw tensor.  Unwrap accordingly.
+        if hasattr(template_output, "input_ids"):
+            # BatchEncoding path (multimodal tokenizer)
+            model_inputs = {k: v.to(model.device) for k, v in template_output.items()
+                            if hasattr(v, "to")}
+            input_ids = model_inputs["input_ids"]
+            input_len = input_ids.shape[1]
+        else:
+            # Plain tensor path
+            input_ids = template_output.to(model.device)
+            model_inputs = {"input_ids": input_ids}
+            input_len = input_ids.shape[1]
 
         with torch.no_grad():
             output_ids = model.generate(
-                input_ids, max_new_tokens=512, temperature=0.1, do_sample=True,
+                **model_inputs, max_new_tokens=512, temperature=0.1, do_sample=True,
             )
 
         response_text = tokenizer.decode(
-            output_ids[0][input_ids.shape[1]:], skip_special_tokens=True
+            output_ids[0][input_len:], skip_special_tokens=True
         )
 
         is_refusal = classify_refusal(response_text)
@@ -207,10 +250,15 @@ def main():
     parser.add_argument("--server-url", default="http://127.0.0.1:8088",
                         help="llama-server base URL (llamacpp backend; 8088 because Windows-side WSL2 binds 8080)")
     parser.add_argument("--use-8bit", action="store_true", help="Use 8-bit quantization (transformers)")
+    parser.add_argument("--limit", type=int, default=None,
+                        help="Evaluate only the first N prompts (useful for smoke tests)")
+    parser.add_argument("--base-only", action="store_true",
+                        help="Skip variants, evaluate only the canonical base prompt per entry")
     args = parser.parse_args()
 
     if args.backend == "llamacpp":
-        evaluate_with_llamacpp(args.server_url, args.model, args.benchmark, args.output)
+        evaluate_with_llamacpp(args.server_url, args.model, args.benchmark, args.output,
+                               limit=args.limit, base_only=args.base_only)
     else:
         from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
         import torch
@@ -228,7 +276,8 @@ def main():
                 args.model, device_map="auto", torch_dtype=torch.bfloat16
             )
         model.eval()
-        evaluate_with_transformers(model, tokenizer, args.benchmark, args.output)
+        evaluate_with_transformers(model, tokenizer, args.benchmark, args.output,
+                                   limit=args.limit, base_only=args.base_only)
 
 
 if __name__ == "__main__":
