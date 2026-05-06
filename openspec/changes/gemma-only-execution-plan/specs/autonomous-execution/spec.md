@@ -8,7 +8,7 @@ Required branches and worktrees:
 | Branch | Worktree path | GPU policy |
 |---|---|---|
 | `agent/env-bootstrap` | `../gb-env/` | gpu-none |
-| `agent/benchmark-eval` | `../gb-bench/` | gpu-none (llama.cpp on CPU) |
+| `agent/benchmark-eval` | `../gb-bench/` | gpu-none (llama-server CPU mode) or gpu-lock-required (llama-server `-ngl` for GPU offload, or transformers backend) |
 | `agent/mechanistic-analysis` | `../gb-mech/` | gpu-lock-required |
 | `agent/abliteration` | `../gb-ablit/` | gpu-lock-required |
 | `agent/weight-diff` | `../gb-wdiff/` | gpu-none (CPU-only) |

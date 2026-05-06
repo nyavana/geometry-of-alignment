@@ -17,6 +17,12 @@
 > the router, or the shared expert is **superseded** by section 7 of
 > the new change's `tasks.md`. Labels "Person A/B/C/D" are now just
 > section names, not ownership.
+>
+> **Tooling references are also superseded.** This document mentions
+> `llama-cpp-python` as the GGUF inference path; the project now uses
+> upstream llama.cpp's `llama-server` (HTTP) instead, built into
+> `shared/llama.cpp-cuda/`. See `CLAUDE.md` "llama-server (GGUF backend)"
+> and `requirements.txt` for the current toolchain.
 
 # Project plan
 

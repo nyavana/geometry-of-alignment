@@ -7,7 +7,7 @@ This is a Python research repository for studying refusal and safety alignment i
 - `src/benchmark/`: refusal evaluation and result analysis.
 - `src/mechanistic/`: activation extraction, refusal directions, layer analysis, and visualizations.
 - `src/abliterate/`: rank-1 weight perturbation and selective safety experiments.
-- `src/weight_diff/`: CPU-based checkpoint diff, SVD, and MoE expert analysis.
+- `src/weight_diff/`: CPU-based checkpoint diff, SVD rank analysis, and comparative cross-method overlay across published Gemma 4 E4B abliteration variants (no MoE — Gemma 4 is dense).
 
 Inputs live in `data/`, especially `data/benchmark_prompts.json`. Generated outputs belong under `results/`; large artifacts are ignored except `.gitkeep` placeholders. Project planning and OpenSpec material live in `docs/` and `openspec/`. Final paper drafts belong in `paper/`.
 
