@@ -137,20 +137,22 @@ def evaluate_with_transformers(model, tokenizer, benchmark_path: str,
         prompt_text = prompt_entry["prompt"]
 
         messages = [{"role": "user", "content": prompt_text}]
+        # transformers v5 + Gemma 4 (multimodal): apply_chat_template returns a
+        # BatchEncoding when return_dict=True. Extract input_ids/attention_mask
+        # explicitly so model.generate sees tensors regardless of tokenizer version.
         template_output = tokenizer.apply_chat_template(
-            messages, return_tensors="pt", add_generation_prompt=True
+            messages, return_tensors="pt", add_generation_prompt=True,
+            return_dict=True,
         )
 
-        # Gemma 4 is a multimodal model — apply_chat_template can return a
-        # BatchEncoding dict rather than a raw tensor.  Unwrap accordingly.
         if hasattr(template_output, "input_ids"):
-            # BatchEncoding path (multimodal tokenizer)
+            # BatchEncoding path (multimodal tokenizer / return_dict=True)
             model_inputs = {k: v.to(model.device) for k, v in template_output.items()
                             if hasattr(v, "to")}
             input_ids = model_inputs["input_ids"]
             input_len = input_ids.shape[1]
         else:
-            # Plain tensor path
+            # Plain tensor path (older tokenizer versions)
             input_ids = template_output.to(model.device)
             model_inputs = {"input_ids": input_ids}
             input_len = input_ids.shape[1]

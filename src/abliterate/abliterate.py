@@ -87,7 +87,12 @@ def abliterate_model(model, refusal_directions: dict,
         if directions.dim() == 1:
             directions = directions.unsqueeze(0)
 
-        layer = model.model.layers[layer_idx]
+        # Gemma 4 multimodal: text layers live at model.model.language_model.layers.
+        # Older Gemma/Llama-style locate them at model.model.layers. Try Gemma 4 first.
+        if hasattr(model.model, "language_model"):
+            layer = model.model.language_model.layers[layer_idx]
+        else:
+            layer = model.model.layers[layer_idx]
 
         def _project_out(weight_matrix, directions, alpha):
             """W_new = W - alpha * sum(d * (d^T @ W)) for each direction d."""

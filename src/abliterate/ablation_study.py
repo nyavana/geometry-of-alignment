@@ -25,6 +25,13 @@ from src.abliterate.abliterate import abliterate_model, compute_refusal_directio
 from src.benchmark.evaluate import evaluate_with_transformers
 
 
+def _get_layers(model):
+    """Return the iterable of transformer layers, handling Gemma 4 multimodal."""
+    if hasattr(model.model, "language_model"):
+        return model.model.language_model.layers
+    return model.model.layers
+
+
 def snapshot_target_weights(model) -> dict:
     """Clone .data of the o_proj + down_proj matrices abliterate mutates.
 
@@ -34,7 +41,7 @@ def snapshot_target_weights(model) -> dict:
     regardless of 8-bit Int8Params wrappers.
     """
     snap = {}
-    for i, layer in enumerate(model.model.layers):
+    for i, layer in enumerate(_get_layers(model)):
         if hasattr(layer, "self_attn") and hasattr(layer.self_attn, "o_proj"):
             snap[(i, "o_proj")] = layer.self_attn.o_proj.weight.data.detach().clone()
         if hasattr(layer, "mlp") and hasattr(layer.mlp, "down_proj"):
@@ -44,7 +51,7 @@ def snapshot_target_weights(model) -> dict:
 
 def restore_target_weights(model, snap: dict) -> None:
     """Restore o_proj + down_proj from a snapshot taken before abliteration."""
-    for i, layer in enumerate(model.model.layers):
+    for i, layer in enumerate(_get_layers(model)):
         if (i, "o_proj") in snap:
             layer.self_attn.o_proj.weight.data = snap[(i, "o_proj")].clone()
         if (i, "down_proj") in snap:
@@ -63,6 +70,9 @@ LAYER_CONFIGS = {
     "second_half": list(range(21, 42)),
     "last_10":     list(range(32, 42)),
     "middle_14":   list(range(14, 28)),
+    # Peak signal band per M2b 4.5: highest Cohen's d at L15, high-signal band L4-L17.
+    "peak_band_4_17": list(range(4, 18)),
+    "peak_layer_15_only": [15],
 }
 
 
@@ -85,13 +95,21 @@ def quick_evaluate(model, tokenizer, benchmark_path: str,
 
     for p in prompts:
         messages = [{"role": "user", "content": p["prompt"]}]
-        input_ids = tokenizer.apply_chat_template(
-            messages, return_tensors="pt", add_generation_prompt=True
-        ).to(model.device)
+        # transformers v5: apply_chat_template returns a BatchEncoding —
+        # explicitly extract the input_ids tensor.
+        encoded = tokenizer.apply_chat_template(
+            messages, return_tensors="pt", add_generation_prompt=True,
+            return_dict=True,
+        )
+        input_ids = encoded["input_ids"].to(model.device)
+        attention_mask = encoded.get("attention_mask")
+        if attention_mask is not None:
+            attention_mask = attention_mask.to(model.device)
 
         with torch.no_grad():
             output_ids = model.generate(
-                input_ids, max_new_tokens=256, temperature=0.1, do_sample=True,
+                input_ids, attention_mask=attention_mask,
+                max_new_tokens=128, temperature=0.1, do_sample=True,
             )
 
         response = tokenizer.decode(
