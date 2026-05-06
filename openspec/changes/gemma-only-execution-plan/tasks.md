@@ -81,7 +81,7 @@ Agent scope: `agent/mechanistic-analysis` worktree (`../gb-mech/`). GPU policy: 
 
 - [ ] 4.1 In `../gb-mech/`, rebase onto `m1-benchmark-frozen`.
 - [ ] 4.2 Verify `src/mechanistic/{extract_activations.py,layer_analysis.py,visualize.py}` and the `ActivationCollector` class. Smoke test on E2B BF16 with 10 prompts inside `scripts/gpu_lock.sh`.
-- [ ] 4.3 Full activation extraction on Gemma 4 E4B 8-bit: refuse-class (`should_refuse` + the five over-refuse categories `emergency_medical`, `wilderness_survival`, `home_safety`, `chemistry_safety`, `mental_health`) → `results/activations/refuse_activations.pt`; comply-class (`safe_control`) → `results/activations/comply_activations.pt`. Also write `results/activations/prompt_metadata.json` with the per-row mapping (`prompt_id`, `category`, `expected`) so M2c 5.12 can slice category-specific subsets without re-extracting on the GPU.
+- [ ] 4.3 Full activation extraction on Gemma 4 E4B 8-bit: refuse-class (`should_refuse` + the five over-refuse categories `emergency_medical`, `wilderness_survival`, `home_safety`, `chemistry_safety`, `mental_health`) → `results/activations/refuse_activations.pt`; comply-class (`safe_control`) → `results/activations/comply_activations.pt`. Also write `results/activations/prompt_metadata.json` with the per-row mapping (`prompt_id`, `category`, `expected`) so M2c 5.9 can slice category-specific subsets without re-extracting on the GPU.
 - [ ] 4.4 Compute refusal directions per layer via mean-diff → `results/activations/refusal_directions.pt`. **CHECKPOINT — push immediately on completion. This is the M2b artifact that unblocks M2c task 5.4 and M3 task 7.10. Do not bundle 4.5–4.9 into the same commit.**
 - [ ] 4.5 Signal-strength + sliding/global comparison → `results/figures/signal_vs_layer.png`.
 - [ ] 4.6 PCA rank analysis per layer → `results/figures/pca_variance_per_layer.png`.
@@ -103,16 +103,13 @@ Dependency: M2b task 4.4 (refusal directions exist) must be complete before 5.4 
 - [ ] 5.4 Pull the latest `agent/mechanistic-analysis` branch into a read-only checkout; copy `refusal_directions.pt` into `../gb-ablit/results/activations/`.
 - [ ] 5.5 Full abliteration of E4B at alpha=1.0, all 42 layers. Save to `models/gemma-4-e4b-abliterated/` (gitignored — record path in commit message).
 - [ ] 5.6 Quick-test: 20 benchmark prompts, confirm refusal removal works. **If refusal removal is incomplete, this is a paper finding** (Gemma 4 RMSNorm/shared-K/V resistance) — document and continue with sweeps.
-- [ ] 5.7 Alpha sweep: [0.0, 0.1, 0.3, 0.5, 0.7, 1.0, 1.2, 1.5, 2.0]. → `results/ablation_results/alpha_sweep.json`.
-- [ ] 5.8 Layer-subset sweep: all, global-only (7 layers), sliding-only (35 layers), first-half (0-20), second-half (21-41), last-10. → `results/ablation_results/layer_subset_sweep.json`.
-- [ ] 5.9 Prompt-count sweep: [10, 25, 50, 100, 200] pairs. → `results/ablation_results/prompt_count_sweep.json`.
-- [ ] 5.10 Random-direction control. → `results/ablation_results/random_direction_control.json`.
-- [ ] 5.11 Capability preservation: MMLU + GSM8K subsets on original vs abliterated. → `results/ablation_results/capability_preservation.json`.
-- [ ] 5.12 Category-specific refusal directions: load `results/activations/refuse_activations.pt` + `prompt_metadata.json` (from M2b 4.3), slice rows by `category` (`emergency_medical`, `wilderness_survival`, `should_refuse`), and compute each category's direction against the `safe_control` baseline. NO re-extraction on the GPU. Pairwise cosine similarity at each layer.
-- [ ] 5.13 Selective abliteration: remove medical refusal direction only; eval over-refusal on medical (target: <10%) + refusal on should_refuse (target: >80%).
-- [ ] 5.14 Figures: `results/figures/{alpha_sweep.png,layer_subset_comparison.png,selective_safety_table.md}`.
-- [ ] 5.15 Hand-off: notify in commit message that abliterated models are ready for section 6 below.
-- [ ] 5.16 Push branch with a final commit whose message includes: alpha curve shape, selective safety verdict, capability delta, and (if applicable) the Gemma 4 architectural-quirk failure note. (M4 9.x reads these from `git log` and aggregates into `STATUS_FOR_HUMAN.md`.)
+- [ ] 5.7 **Sweep ensemble (single model load).** Run `python -m src.abliterate.ablation_study --model google/gemma-4-E4B-it --activations results/activations/ --benchmark data/benchmark_prompts.json --use-8bit --output results/ablation_results/`. The script loads the model + tokenizer once, snapshots the abliteration-target weights (`o_proj`, `down_proj` for all 42 layers), and runs alpha sweep + layer-subset sweep + random-direction control in sequence — restoring from the snapshot before each iteration to avoid disk reloads. Outputs: `alpha_sweep.json`, `layer_subset_sweep.json`, `random_direction_control.json` (and `sweep_results.json` aggregate). The prompt-count sweep `[10, 25, 50, 100, 200]` produces `prompt_count_sweep.json` — currently a follow-up since it requires recomputing directions per N rather than reusing the snapshot.
+- [ ] 5.8 Capability preservation: MMLU + GSM8K subsets on original vs abliterated. → `results/ablation_results/capability_preservation.json`.
+- [ ] 5.9 Category-specific refusal directions: load `results/activations/refuse_activations.pt` + `prompt_metadata.json` (from M2b 4.3), slice rows by `category` (`emergency_medical`, `wilderness_survival`, `should_refuse`), and compute each category's direction against the `safe_control` baseline. NO re-extraction on the GPU. Pairwise cosine similarity at each layer.
+- [ ] 5.10 Selective abliteration: remove medical refusal direction only; eval over-refusal on medical (target: <10%) + refusal on should_refuse (target: >80%).
+- [ ] 5.11 Figures: `results/figures/{alpha_sweep.png,layer_subset_comparison.png,selective_safety_table.md}`.
+- [ ] 5.12 Hand-off: notify in commit message that abliterated models are ready for section 6 below.
+- [ ] 5.13 Push branch with a final commit whose message includes: alpha curve shape, selective safety verdict, capability delta, and (if applicable) the Gemma 4 architectural-quirk failure note. (M4 9.x reads these from `git log` and aggregates into `STATUS_FOR_HUMAN.md`.)
 
 ## 6. M2c-followup — Benchmark on the project's own abliterated model
 
@@ -121,7 +118,7 @@ Agent scope: `agent/benchmark-eval` worktree. GPU policy: gpu-lock-required for 
 
 - [ ] 6.1 Pull abliterated model paths from `agent/abliteration` (cherry-pick or operator-mediated).
 - [ ] 6.2 Run `evaluate.py --backend transformers --use-8bit` against `models/gemma-4-e4b-abliterated/`. Output to `results/refusal_rates/gemma4_e4b_self_abliterated.csv`.
-- [ ] 6.3 If selective abliteration produced a model in 5.13, evaluate that too. → `results/refusal_rates/gemma4_e4b_self_selective.csv`.
+- [ ] 6.3 If selective abliteration produced a model in 5.10, evaluate that too. → `results/refusal_rates/gemma4_e4b_self_selective.csv`.
 - [ ] 6.4 Regenerate `results/figures/refusal_heatmap.png` including the new rows (now ~6–7 rows: base, E2B, OBLITERATUS, TrevorJS, HauhauCS, self-abliterated, self-selective).
 - [ ] 6.5 Push branch with a final commit whose message includes: refusal rate on `should_refuse` for the self-abliterated model and (if produced) the self-selectively-abliterated model. (M4 9.x reads these from `git log` and aggregates into `STATUS_FOR_HUMAN.md`.)
 
@@ -176,7 +173,7 @@ Same as predecessor — drafted on `agent/weight-diff` or `agent/writeup`. GPU p
 Goal: produce `STATUS_FOR_HUMAN.md` and wait for operator's green-light sentence.
 Agent scope: `agent/writeup`. GPU policy: gpu-none.
 
-- [ ] 9.1 For each branch in {`agent/benchmark-eval`, `agent/mechanistic-analysis`, `agent/abliteration`, `agent/weight-diff`}, run `git log -1 origin/<branch>` and extract the headline numbers from the final commit message (the patterns documented in tasks 3.13, 4.9, 5.16, 6.5, 7.14). Aggregate into the section (a)–(e) entries below.
+- [ ] 9.1 For each branch in {`agent/benchmark-eval`, `agent/mechanistic-analysis`, `agent/abliteration`, `agent/weight-diff`}, run `git log -1 origin/<branch>` and extract the headline numbers from the final commit message (the patterns documented in tasks 3.13, 4.9, 5.13, 6.5, 7.14). Aggregate into the section (a)–(e) entries below.
 - [ ] 9.2 Section (a) "Branch and commit status."
 - [ ] 9.3 Section (b) "Refusal rates table" — copy from `results/refusal_rates/`. Cite each row's source CSV.
 - [ ] 9.4 Section (c) "Mechanistic analysis summary" — peak layer indices, signal strength plot, rank-1 verdict.

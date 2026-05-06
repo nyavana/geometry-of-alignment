@@ -25,6 +25,32 @@ from src.abliterate.abliterate import abliterate_model, compute_refusal_directio
 from src.benchmark.evaluate import evaluate_with_transformers
 
 
+def snapshot_target_weights(model) -> dict:
+    """Clone .data of the o_proj + down_proj matrices abliterate mutates.
+
+    Same device as the live weights — sufficient for restoring between
+    sweep iterations without disk reloads. abliterate_model() writes to
+    weight.data via _project_out, so cloning .data is the right granularity
+    regardless of 8-bit Int8Params wrappers.
+    """
+    snap = {}
+    for i, layer in enumerate(model.model.layers):
+        if hasattr(layer, "self_attn") and hasattr(layer.self_attn, "o_proj"):
+            snap[(i, "o_proj")] = layer.self_attn.o_proj.weight.data.detach().clone()
+        if hasattr(layer, "mlp") and hasattr(layer.mlp, "down_proj"):
+            snap[(i, "down_proj")] = layer.mlp.down_proj.weight.data.detach().clone()
+    return snap
+
+
+def restore_target_weights(model, snap: dict) -> None:
+    """Restore o_proj + down_proj from a snapshot taken before abliteration."""
+    for i, layer in enumerate(model.model.layers):
+        if (i, "o_proj") in snap:
+            layer.self_attn.o_proj.weight.data = snap[(i, "o_proj")].clone()
+        if (i, "down_proj") in snap:
+            layer.mlp.down_proj.weight.data = snap[(i, "down_proj")].clone()
+
+
 # Gemma 4 E4B layer subsets — verify these indices
 GLOBAL_LAYERS = [5, 11, 17, 23, 29, 35, 41]
 SLIDING_LAYERS = [i for i in range(42) if i not in GLOBAL_LAYERS]
@@ -88,52 +114,49 @@ def quick_evaluate(model, tokenizer, benchmark_path: str,
     }
 
 
-def run_alpha_sweep(model_name: str, directions: dict,
-                    tokenizer, benchmark_path: str, use_8bit: bool,
-                    output_dir: Path) -> list[dict]:
-    """Sweep alpha from 0 to 2.0."""
+def run_alpha_sweep(model, tokenizer, directions: dict, snapshot: dict,
+                    benchmark_path: str) -> list[dict]:
+    """Sweep alpha from 0 to 2.0. Restores model weights from snapshot
+    before each iteration so the model object is reused across sweeps."""
     alphas = [0.0, 0.1, 0.3, 0.5, 0.7, 1.0, 1.2, 1.5, 2.0]
     results = []
 
     for alpha in alphas:
         print(f"\n--- Alpha = {alpha} ---")
-        model, _ = load_model_and_tokenizer(model_name, use_8bit)
+        restore_target_weights(model, snapshot)
         abliterate_model(model, directions, alpha=alpha)
         scores = quick_evaluate(model, tokenizer, benchmark_path)
         results.append({"axis": "alpha", "alpha": alpha, "layers": "all", **scores})
         print(f"  Refusal rate: {scores['refusal_rate']:.1%}, "
               f"Over-refusal: {scores['over_refusal_rate']:.1%}")
-        del model
         torch.cuda.empty_cache()
 
     return results
 
 
-def run_layer_sweep(model_name: str, directions: dict,
-                    tokenizer, benchmark_path: str, use_8bit: bool,
-                    output_dir: Path) -> list[dict]:
+def run_layer_sweep(model, tokenizer, directions: dict, snapshot: dict,
+                    benchmark_path: str) -> list[dict]:
     """Sweep which layers to abliterate."""
     results = []
 
     for config_name, layers in LAYER_CONFIGS.items():
         print(f"\n--- Layers: {config_name} ({len(layers)} layers) ---")
-        model, _ = load_model_and_tokenizer(model_name, use_8bit)
+        restore_target_weights(model, snapshot)
         abliterate_model(model, directions, layers_to_modify=layers, alpha=1.0)
         scores = quick_evaluate(model, tokenizer, benchmark_path)
         results.append({"axis": "layers", "alpha": 1.0,
                         "layers": config_name, "layer_count": len(layers), **scores})
         print(f"  Refusal rate: {scores['refusal_rate']:.1%}")
-        del model
         torch.cuda.empty_cache()
 
     return results
 
 
-def run_random_control(model_name: str, tokenizer, benchmark_path: str,
-                       use_8bit: bool, hidden_dim: int = 2560) -> dict:
+def run_random_control(model, tokenizer, snapshot: dict,
+                       benchmark_path: str, hidden_dim: int = 2560) -> dict:
     """Control: abliterate with random directions (should NOT work)."""
     print("\n--- CONTROL: Random direction ---")
-    model, _ = load_model_and_tokenizer(model_name, use_8bit)
+    restore_target_weights(model, snapshot)
 
     random_dirs = {}
     for i in range(42):
@@ -144,7 +167,6 @@ def run_random_control(model_name: str, tokenizer, benchmark_path: str,
     abliterate_model(model, random_dirs, alpha=1.0)
     scores = quick_evaluate(model, tokenizer, benchmark_path)
     print(f"  Refusal rate: {scores['refusal_rate']:.1%} (should be ~same as original)")
-    del model
     torch.cuda.empty_cache()
 
     return {"axis": "control_random", "alpha": 1.0, **scores}
@@ -170,9 +192,11 @@ def main():
         if directions[k].dim() == 1:
             directions[k] = directions[k].unsqueeze(0)
 
-    # Load tokenizer once
-    from transformers import AutoTokenizer
-    tokenizer = AutoTokenizer.from_pretrained(args.model)
+    # Single load — model + tokenizer are reused across all sweeps via the
+    # snapshot/restore mechanism, avoiding O(N) reloads from disk.
+    print("\nLoading model and tokenizer once for the full sweep ensemble...")
+    model, tokenizer = load_model_and_tokenizer(args.model, args.use_8bit)
+    snapshot = snapshot_target_weights(model)
 
     all_results = []
 
@@ -181,8 +205,7 @@ def main():
     print("ALPHA SWEEP")
     print("=" * 50)
     all_results.extend(
-        run_alpha_sweep(args.model, directions, tokenizer,
-                        args.benchmark, args.use_8bit, output_dir)
+        run_alpha_sweep(model, tokenizer, directions, snapshot, args.benchmark)
     )
 
     # Layer sweep
@@ -190,8 +213,7 @@ def main():
     print("LAYER SWEEP")
     print("=" * 50)
     all_results.extend(
-        run_layer_sweep(args.model, directions, tokenizer,
-                        args.benchmark, args.use_8bit, output_dir)
+        run_layer_sweep(model, tokenizer, directions, snapshot, args.benchmark)
     )
 
     # Random control
@@ -199,7 +221,7 @@ def main():
     print("RANDOM CONTROL")
     print("=" * 50)
     all_results.append(
-        run_random_control(args.model, tokenizer, args.benchmark, args.use_8bit)
+        run_random_control(model, tokenizer, snapshot, args.benchmark)
     )
 
     # Save all results
