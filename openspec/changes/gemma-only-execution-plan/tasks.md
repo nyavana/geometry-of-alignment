@@ -84,10 +84,10 @@ Goal: layer-by-layer activation extraction, refusal direction computation, layer
 
 Agent scope: `agent/mechanistic-analysis` worktree (`../gb-mech/`). GPU policy: gpu-lock-required for all model loads.
 
-- [ ] 4.1 In `../gb-mech/`, rebase onto `origin/main` (see preamble — `m1-benchmark-frozen` is stale).
-- [ ] 4.2 Verify `src/mechanistic/{extract_activations.py,layer_analysis.py,visualize.py}` and the `ActivationCollector` class. Smoke test on E2B BF16 with 10 prompts inside `scripts/gpu_lock.sh`.
-- [ ] 4.3 Full activation extraction on Gemma 4 E4B 8-bit: refuse-class (`should_refuse` + the five over-refuse categories `emergency_medical`, `wilderness_survival`, `home_safety`, `chemistry_safety`, `mental_health`) → `results/activations/refuse_activations.pt`; comply-class (`safe_control`) → `results/activations/comply_activations.pt`. Also write `results/activations/prompt_metadata.json` with the per-row mapping (`prompt_id`, `category`, `expected`) so M2c 5.9 can slice category-specific subsets without re-extracting on the GPU.
-- [ ] 4.4 Compute refusal directions per layer via mean-diff → `$RESULTS_DIR/activations/refusal_directions.pt` (resolves to `/home/nyavana/columbia/6699/shared/results/agent/mechanistic-analysis/activations/refusal_directions.pt`). Also commit a redundant copy into `results/activations/refusal_directions.pt` (the `.gitignore` allowlist permits this) and push the branch. **CHECKPOINT — push immediately on completion. This is the M2b artifact that unblocks M2c task 5.4 and M3 task 7.10. Do not bundle 4.5–4.9 into the same commit.**
+- [x] 4.1 In `../gb-mech/`, rebase onto `origin/main` (see preamble — `m1-benchmark-frozen` is stale). *(commit 8258849 on agent/mechanistic-analysis: HEAD already matched origin/main at dispatch time)*
+- [x] 4.2 Verify `src/mechanistic/{extract_activations.py,layer_analysis.py,visualize.py}` and the `ActivationCollector` class. Smoke test on E2B BF16 with 10 prompts inside `scripts/gpu_lock.sh`. *(commit 5132291 on agent/mechanistic-analysis: corrected to Gemma 4 multimodal layer path `model.language_model.layers`; smoke test passes)*
+- [x] 4.3 Full activation extraction on Gemma 4 E4B 8-bit: refuse-class (`should_refuse` + the five over-refuse categories `emergency_medical`, `wilderness_survival`, `home_safety`, `chemistry_safety`, `mental_health`) → `results/activations/refuse_activations.pt`; comply-class (`safe_control`) → `results/activations/comply_activations.pt`. Also write `results/activations/prompt_metadata.json` with the per-row mapping (`prompt_id`, `category`, `expected`) so M2c 5.9 can slice category-specific subsets without re-extracting on the GPU. *(commit 4fa3fdc on agent/mechanistic-analysis; artifacts present at `$RESULTS_DIR/activations/`)*
+- [x] 4.4 Compute refusal directions per layer via mean-diff → `$RESULTS_DIR/activations/refusal_directions.pt` (resolves to `/home/nyavana/columbia/6699/shared/results/agent/mechanistic-analysis/activations/refusal_directions.pt`). Also commit a redundant copy into `results/activations/refusal_directions.pt` (the `.gitignore` allowlist permits this) and push the branch. **CHECKPOINT — push immediately on completion. This is the M2b artifact that unblocks M2c task 5.4 and M3 task 7.10. Do not bundle 4.5–4.9 into the same commit.** *(commit 57cedcf on agent/mechanistic-analysis; artifact: 442 KB at `$RESULTS_DIR` and in-repo redundant copy)*
 - [ ] 4.5 Signal-strength + sliding/global comparison → `results/figures/signal_vs_layer.png`.
 - [ ] 4.6 PCA rank analysis per layer → `results/figures/pca_variance_per_layer.png`.
 - [ ] 4.7 UMAP/t-SNE multi-layer grid → `results/figures/umap_layer_*.png`.
@@ -140,15 +140,15 @@ Agent scope: `agent/weight-diff` worktree (`../gb-wdiff/`). GPU policy: gpu-none
 
 **Dependencies:** Tasks 7.1–7.9 are independent of M2b and can run as soon as the worktree is ready. Task 7.10 (cross-reference with refusal directions) BLOCKS until `agent/mechanistic-analysis` has produced `refusal_directions.pt` (M2b task 4.4) — read it from `/home/nyavana/columbia/6699/shared/results/agent/mechanistic-analysis/activations/refusal_directions.pt`, or as fallback from `origin/agent/mechanistic-analysis:results/activations/refusal_directions.pt`.
 
-- [ ] 7.1 In `../gb-wdiff/`, rebase onto `origin/main` (see preamble — `m1-benchmark-frozen` is stale).
-- [ ] 7.2 **Pre-flight: disk + license check.**
+- [x] 7.1 In `../gb-wdiff/`, rebase onto `origin/main` (see preamble — `m1-benchmark-frozen` is stale). *(commit b657b6a on agent/weight-diff)*
+- [x] 7.2 **Pre-flight: disk + license check.** *(commit b657b6a; 600 GB free; both variants Apache 2.0)*
   - Run `df -h /home/nyavana/columbia/6699/shared/` — confirm ≥40 GB free.
   - Read each variant's HuggingFace model card to verify license inheritance (OBLITERATUS card states Apache 2.0 from base; verify TrevorJS).
   - If insufficient disk OR a license blocker, stop and surface to operator.
-- [ ] 7.3 Download `OBLITERATUS/gemma-4-E4B-it-OBLITERATED` bf16 safetensors via `huggingface-cli download` to `model/OBLITERATUS-gemma-4-E4B-it-OBLITERATED/`.
-- [ ] 7.4 Download `TrevorJS/gemma-4-E4B-it-uncensored` bf16 safetensors to `model/TrevorJS-gemma-4-E4B-it-uncensored/`.
-- [ ] 7.5 **Pre-flight: shape/key compatibility.** For each variant, load the state-dict header and assert keys match base; assert shapes match. If TrevorJS fails, log to `results/weight_diffs/.compat_log.md` and proceed with OBLITERATUS only (per design D2 fallback). If OBLITERATUS fails, stop and surface to operator.
-- [ ] 7.6 Smoke-test `src/weight_diff/compute_diff.py` and `svd_analysis.py`: run against (base × OBLITERATUS) for one layer only. Confirm scripts produce JSON output and don't error.
+- [x] 7.3 Download `OBLITERATUS/gemma-4-E4B-it-OBLITERATED` bf16 safetensors via `huggingface-cli download` to `model/OBLITERATUS-gemma-4-E4B-it-OBLITERATED/`. *(commit b657b6a; downloaded to shared/model/)*
+- [x] 7.4 Download `TrevorJS/gemma-4-E4B-it-uncensored` bf16 safetensors to `model/TrevorJS-gemma-4-E4B-it-uncensored/`. *(commit b657b6a; downloaded to shared/model/)*
+- [x] 7.5 **Pre-flight: shape/key compatibility.** For each variant, load the state-dict header and assert keys match base; assert shapes match. If TrevorJS fails, log to `results/weight_diffs/.compat_log.md` and proceed with OBLITERATUS only (per design D2 fallback). If OBLITERATUS fails, stop and surface to operator. *(commit b657b6a; both variants passed — empty `.compat_log.md` ⇒ 7.7 may run `--strict` for OBLITERATUS and standard mode for TrevorJS)*
+- [x] 7.6 Smoke-test `src/weight_diff/compute_diff.py` and `svd_analysis.py`: run against (base × OBLITERATUS) for one layer only. Confirm scripts produce JSON output and don't error. *(commit b657b6a)*
 - [ ] 7.7 **Full weight diff per variant.** For each variant in `[OBLITERATUS, TrevorJS]` that passed pre-flight 7.5, run `python -m src.weight_diff.compute_diff --original model/gemma-4-E4B-it/ --modified model/<variant>/ --output $RESULTS_DIR/weight_diffs/<variant_slug>/` (use `--strict` for OBLITERATUS, omit for TrevorJS — see 7.5). Each run peaks ~32–35 GB RAM; the WSL2 instance is capped at 46 GB physical, so **run the variants sequentially, not in parallel** (two parallel runs would need ~68 GB combined and oversubscribe).
 - [ ] 7.8 **SVD analysis per variant.** For each variant whose diff exists, run `python -m src.weight_diff.svd_analysis --results results/weight_diffs/<variant_slug>/weight_diff_results.json`. Produces effective rank at 95/99% and top-5 singular vectors per significantly-modified weight (saved as `.pt`). Parallelizable across variants.
 - [ ] 7.9 **Cross-method comparison:** new analysis script (or extend `svd_analysis.py`):
@@ -166,11 +166,11 @@ Agent scope: `agent/weight-diff` worktree (`../gb-wdiff/`). GPU policy: gpu-none
 
 Same as predecessor — drafted on `agent/weight-diff` or `agent/writeup`. GPU policy: gpu-none.
 
-- [ ] 8.1 RLHF (Christiano 2017, Ouyang 2022), DPO (Rafailov 2023), Constitutional AI (Bai 2022).
-- [ ] 8.2 Representation engineering (Zou 2023), linear representation hypothesis.
-- [ ] 8.3 Abliteration: Arditi 2024, Heretic (p-e-w 2025), OBLITERATUS (elder-plinius 2025), grimjim's norm-preserving biprojection.
-- [ ] 8.4 Over-refusal: Rottger 2024 (XSTest), Cui 2024.
-- [ ] 8.5 Gemma 4 architectural quirks: source the "doesn't work on Gemma 4" findings (Heretic GitHub issues, OBLITERATUS card).
+- [x] 8.1 RLHF (Christiano 2017, Ouyang 2022), DPO (Rafailov 2023), Constitutional AI (Bai 2022). *(commit 38fb89a on agent/writeup; seeded `paper/sections/02_background.md`)*
+- [x] 8.2 Representation engineering (Zou 2023), linear representation hypothesis. *(commit 3bf01f1 on agent/writeup; in `paper/sections/02_background.md`)*
+- [x] 8.3 Abliteration: Arditi 2024, Heretic (p-e-w 2025), OBLITERATUS (elder-plinius 2025), grimjim's norm-preserving biprojection. *(commit 78044fc on agent/writeup; seeded `paper/sections/03_related_work.md`)*
+- [x] 8.4 Over-refusal: Rottger 2024 (XSTest), Cui 2024. *(commit 033eb46 on agent/writeup; in `paper/sections/03_related_work.md`)*
+- [x] 8.5 Gemma 4 architectural quirks: source the "doesn't work on Gemma 4" findings (Heretic GitHub issues, OBLITERATUS card). *(commit cce3829 on agent/writeup; in `paper/sections/03_related_work.md`)*
 - [ ] 8.6 Output to `paper/sections/02_background.md` and `paper/sections/03_related_work.md`. Min 15 citations.
 
 ## 9. M4 — Human Verification Gate
