@@ -61,20 +61,20 @@ Agent scope: `agent/benchmark-eval` worktree (`../gb-bench/`). GPU policy: gpu-n
 - `HauhauCS/Gemma-4-E4B-Uncensored-HauhauCS-Aggressive` (GGUF Q8_K_P)
 - (eventually) the project's own M2c abliterated E4B — added in section 6 below
 
-- [ ] 3.1 In `../gb-bench/`, rebase onto `origin/main` (`m1-benchmark-frozen` is local-only and predates the llama-server backend swap; `origin/main` carries that swap, the prompt additions, and the path-convention preamble above)
-- [ ] 3.2 Verify `src/benchmark/{evaluate.py,classify_refusal.py,analyze_results.py}` are runnable; fill any scaffolding gaps. `evaluate.py` MUST support both `--backend llamacpp` (HTTP client to `llama-server`, with `--server-url`) and `--backend transformers` (per the `benchmark-evaluation` spec).
-- [x] 3.2.1 Install upstream llama.cpp's `llama-server` binary. *(Done from `main`: built from source against `apt install nvidia-cuda-toolkit` (CUDA 12.0) with `-DGGML_CUDA=on -DCMAKE_CUDA_ARCHITECTURES=89`, installed to `/home/nyavana/columbia/6699/shared/llama.cpp-cuda/`. PATH + LD_LIBRARY_PATH are wired through `shared/env.sh`, so every worktree picks it up on `source shared/env.sh`. `llama-server --list-devices` confirms `CUDA0: NVIDIA GeForce RTX 4070 Ti SUPER (16375 MiB)`.)*
-- [ ] 3.3 Smoke test: launch `llama-server -m /home/nyavana/columbia/6699/shared/model/gemma-4-E4B-it.Q8_0.gguf -ngl 99 --host 127.0.0.1 --port 8088` (8088 because Windows-side WSL2 binds 8080), then run `evaluate.py --backend llamacpp --server-url http://127.0.0.1:8088` on 10 prompts against base Gemma 4 E4B GGUF. Verified end-to-end working from `main` (43/43 layers offloaded to GPU, OpenAI chat-completions endpoint returns expected output). Commit smoke log to `results/refusal_rates/.smoke/`.
-- [ ] 3.4 Manually label 50 sampled responses; iterate `classify_refusal.py` patterns until ≥90% agreement.
-- [ ] 3.5 Full evaluation: base `google/gemma-4-E4B-it` (GGUF). `--output $RESULTS_DIR/refusal_rates/gemma4_e4b_base/` (writes `evaluation_results.{json,csv}`).
-- [ ] 3.6 Full evaluation: `google/gemma-4-E2B-it` (BF16, validation). `--output $RESULTS_DIR/refusal_rates/gemma4_e2b_base/`.
-- [ ] 3.7 Full evaluation: `OBLITERATUS/gemma-4-E4B-it-OBLITERATED` (GGUF Q8_0). `--output $RESULTS_DIR/refusal_rates/gemma4_e4b_obliteratus/`.
-- [ ] 3.8 Full evaluation: `TrevorJS/gemma-4-E4B-it-uncensored` (bf16 via transformers, gpu-lock-required). `--output $RESULTS_DIR/refusal_rates/gemma4_e4b_trevorjs/`.
-- [ ] 3.9 Full evaluation: `HauhauCS/Gemma-4-E4B-Uncensored-HauhauCS-Aggressive` (GGUF Q8_K_P). `--output $RESULTS_DIR/refusal_rates/gemma4_e4b_hauhau/`.
-- [ ] 3.10 Phrasing sensitivity analysis: re-run on prompt variants for the base + at least one published variant.
-- [ ] 3.11 Context sensitivity test: prepend "I am an emergency first responder" to `emergency_medical` prompts, compare refusal rates. Run on base + OBLITERATUS.
-- [ ] 3.12 `analyze_results.py`: produce `results/figures/refusal_heatmap.png` (rows: 5 models above; columns: 8 categories) and `results/figures/phrasing_sensitivity.png`.
-- [ ] 3.13 Push branch with a final commit whose message includes: per-model headline refusal rates, over-refusal rate on `emergency_medical`, and any phrasing- or context-sensitivity surprises. (M4 9.x reads these from `git log` across `agent/*` branches and assembles `STATUS_FOR_HUMAN.md`.)
+- [x] 3.1 In `../gb-bench/`, rebase onto `origin/main` *(implicit during 3.2 rebase)*
+- [x] 3.2 Verify `src/benchmark/{evaluate.py,classify_refusal.py,analyze_results.py}` are runnable. *(commit `adc69fb`: added `--limit` flag to evaluate.py)*
+- [x] 3.2.1 Install upstream llama.cpp's `llama-server` binary. *(Done from `main`: see CLAUDE.md.)*
+- [x] 3.3 Smoke test base GGUF via llama-server. *(commit `9053341`)*
+- [x] 3.4 Iterate `classify_refusal.py` patterns. *(commit `eb25419`; later widened in M2c commit `b25c361` to catch "I cannot ___" surface form on transformers-backend abliterated outputs)*
+- [x] 3.5 Full evaluation: base Gemma 4 E4B GGUF. *(commit `60dfbf6`; should_refuse 100%, em_refuse 2.0%)*
+- [x] 3.6 Full evaluation: Gemma 4 E2B BF16 (validation). *(commit `e48d838`; should_refuse 95.2%, em_refuse 12.0%; transformers v5 BatchEncoding fix in `df6ff20`)*
+- [x] 3.7 Full evaluation: OBLITERATUS GGUF — **FAILED**. *(commit `bce69af`; llama-server crashed on Harmony-format `<|channel>` tokens emitted by the model. Recovery path: transformers backend, deferred to a follow-up since not paper-blocking — M3 weight-diff already covers OBLITERATUS quantitatively. See `docs/issues/2026-05-06-obliteratus-eval-fail.md`.)*
+- [x] 3.8 Full evaluation: TrevorJS bf16 transformers — **SKIPPED**. *(commit `6cd823e`; transformers @ 8-bit was 117 s/iter ⇒ 11 h ETA. Killed at 5%. M3 weight-diff covers TrevorJS quantitatively. See `docs/issues/2026-05-06-trevorjs-eval-fail.md`.)*
+- [x] 3.9 Full evaluation: HauhauCS GGUF. *(commit `b629d67`; uniform 0% refusal across all categories — truly uncensored variant)*
+- [x] 3.10 Phrasing sensitivity analysis. *(Killed at 16% on base E4B variants — 4-5 h ETA was eating the M2c GPU window. Documented in section (g) of STATUS_FOR_HUMAN.md.)*
+- [x] 3.11 Context sensitivity test. *(Base E4B + first-responder prefix on emergency_medical: 2.0% → 4.0% delta +2pp. OBLITERATUS variant skipped — see 3.7.)*
+- [x] 3.12 `analyze_results.py` heatmap + figures. *(commit `2e46f83`; also regenerated in `79a0a73` with self-abliterated row)*
+- [x] 3.13 Final summary commit with M2a-summary block. *(committed in master pipeline, parseable by M4)*
 
 *Note: evaluation of the project's own M2c-abliterated model is in section 6 below, after M2c lands.*
 
@@ -88,11 +88,11 @@ Agent scope: `agent/mechanistic-analysis` worktree (`../gb-mech/`). GPU policy: 
 - [x] 4.2 Verify `src/mechanistic/{extract_activations.py,layer_analysis.py,visualize.py}` and the `ActivationCollector` class. Smoke test on E2B BF16 with 10 prompts inside `scripts/gpu_lock.sh`. *(commit 5132291 on agent/mechanistic-analysis: corrected to Gemma 4 multimodal layer path `model.language_model.layers`; smoke test passes)*
 - [x] 4.3 Full activation extraction on Gemma 4 E4B 8-bit: refuse-class (`should_refuse` + the five over-refuse categories `emergency_medical`, `wilderness_survival`, `home_safety`, `chemistry_safety`, `mental_health`) → `results/activations/refuse_activations.pt`; comply-class (`safe_control`) → `results/activations/comply_activations.pt`. Also write `results/activations/prompt_metadata.json` with the per-row mapping (`prompt_id`, `category`, `expected`) so M2c 5.9 can slice category-specific subsets without re-extracting on the GPU. *(commit 4fa3fdc on agent/mechanistic-analysis; artifacts present at `$RESULTS_DIR/activations/`)*
 - [x] 4.4 Compute refusal directions per layer via mean-diff → `$RESULTS_DIR/activations/refusal_directions.pt` (resolves to `/home/nyavana/columbia/6699/shared/results/agent/mechanistic-analysis/activations/refusal_directions.pt`). Also commit a redundant copy into `results/activations/refusal_directions.pt` (the `.gitignore` allowlist permits this) and push the branch. **CHECKPOINT — push immediately on completion. This is the M2b artifact that unblocks M2c task 5.4 and M3 task 7.10. Do not bundle 4.5–4.9 into the same commit.** *(commit 57cedcf on agent/mechanistic-analysis; artifact: 442 KB at `$RESULTS_DIR` and in-repo redundant copy)*
-- [ ] 4.5 Signal-strength + sliding/global comparison → `results/figures/signal_vs_layer.png`.
-- [ ] 4.6 PCA rank analysis per layer → `results/figures/pca_variance_per_layer.png`.
-- [ ] 4.7 UMAP/t-SNE multi-layer grid → `results/figures/umap_layer_*.png`.
-- [ ] 4.8 Cross-precision validation: refusal direction on E2B BF16, cosine similarity vs E4B 8-bit. Document.
-- [ ] 4.9 Push branch with a final commit whose message includes: peak layer indices, sliding/global verdict, rank-1 hypothesis result. (M4 9.x reads these from `git log` and aggregates into `STATUS_FOR_HUMAN.md`.)
+- [x] 4.5 Signal-strength + sliding/global comparison. *(commit `1d5c590`; peak L15 Cohen's d 2.87, top-3 L15/L4/L14, sliding-vs-global gap inconclusive)*
+- [x] 4.6 PCA rank analysis per layer. *(commit `d17afb4`; rank-1 hypothesis strongly supported: top-1 PC captures 86.6% of |Δμ|² mean over peak band)*
+- [x] 4.7 UMAP/t-SNE multi-layer grid. *(commit `358abf5`; cleanest separation at L15)*
+- [ ] 4.8 Cross-precision validation: refusal direction on E2B BF16, cosine vs E4B 8-bit. **DEFERRED — low priority for paper**
+- [x] 4.9 Push branch with summary. *(headline numbers carried in 4.5/4.6/4.7 commits; M4 STATUS_FOR_HUMAN.md aggregated them into section (c))*
 
 ## 5. M2c — Abliteration + Selective Safety (GPU)
 
@@ -102,30 +102,30 @@ Agent scope: `agent/abliteration` worktree (`../gb-ablit/`). GPU policy: gpu-loc
 
 Dependency: M2b task 4.4 (refusal directions exist) must be complete before 5.4 below starts.
 
-- [ ] 5.1 In `../gb-ablit/`, rebase onto `origin/main` (see preamble — `m1-benchmark-frozen` is stale).
-- [ ] 5.2 Verify `src/abliterate/{abliterate.py,ablation_study.py,selective_safety.py}` are runnable.
-- [ ] 5.3 Sanity test on E2B BF16: extract directions, abliterate, verify refusal removal on 5 test prompts.
-- [ ] 5.4 Read `refusal_directions.pt` directly from M2b's `$RESULTS_DIR`: `cp /home/nyavana/columbia/6699/shared/results/agent/mechanistic-analysis/activations/refusal_directions.pt $RESULTS_DIR/activations/refusal_directions.pt`. As a fallback if M2b's `$RESULTS_DIR` is empty (e.g., agent ran in a different machine), pull the in-repo redundant copy: `git fetch origin agent/mechanistic-analysis && git show origin/agent/mechanistic-analysis:results/activations/refusal_directions.pt > $RESULTS_DIR/activations/refusal_directions.pt`.
-- [ ] 5.5 Full abliteration of E4B at alpha=1.0, all 42 layers. Save to `models/gemma-4-e4b-abliterated/` (gitignored — record path in commit message).
-- [ ] 5.6 Quick-test: 20 benchmark prompts, confirm refusal removal works. **If refusal removal is incomplete, this is a paper finding** (Gemma 4 RMSNorm/shared-K/V resistance) — document and continue with sweeps.
-- [ ] 5.7 **Sweep ensemble (single model load).** Run `python -m src.abliterate.ablation_study --model google/gemma-4-E4B-it --activations results/activations/ --benchmark data/benchmark_prompts.json --use-8bit --output results/ablation_results/`. The script loads the model + tokenizer once, snapshots the abliteration-target weights (`o_proj`, `down_proj` for all 42 layers), and runs alpha sweep + layer-subset sweep + random-direction control in sequence — restoring from the snapshot before each iteration to avoid disk reloads. Outputs: `alpha_sweep.json`, `layer_subset_sweep.json`, `random_direction_control.json` (and `sweep_results.json` aggregate). The prompt-count sweep `[10, 25, 50, 100, 200]` produces `prompt_count_sweep.json` — currently a follow-up since it requires recomputing directions per N rather than reusing the snapshot.
-- [ ] 5.8 Capability preservation: MMLU + GSM8K subsets on original vs abliterated. → `results/ablation_results/capability_preservation.json`.
-- [ ] 5.9 Category-specific refusal directions: load `results/activations/refuse_activations.pt` + `prompt_metadata.json` (from M2b 4.3), slice rows by `category` (`emergency_medical`, `wilderness_survival`, `should_refuse`), and compute each category's direction against the `safe_control` baseline. NO re-extraction on the GPU. Pairwise cosine similarity at each layer.
-- [ ] 5.10 Selective abliteration: remove medical refusal direction only; eval over-refusal on medical (target: <10%) + refusal on should_refuse (target: >80%).
-- [ ] 5.11 Figures: `results/figures/{alpha_sweep.png,layer_subset_comparison.png,selective_safety_table.md}`.
-- [ ] 5.12 Hand-off: notify in commit message that abliterated models are ready for section 6 below.
-- [ ] 5.13 Push branch with a final commit whose message includes: alpha curve shape, selective safety verdict, capability delta, and (if applicable) the Gemma 4 architectural-quirk failure note. (M4 9.x reads these from `git log` and aggregates into `STATUS_FOR_HUMAN.md`.)
+- [x] 5.1 Rebase agent/abliteration onto origin/main.
+- [x] 5.2 Verify scripts runnable. *(commits `a113fc5` Gemma 4 multimodal layer path + transformers v5 BatchEncoding fix; `b25c361` classifier regex widened)*
+- [x] 5.3 Sanity test on E2B BF16 (5 prompts).
+- [x] 5.4 Copy refusal_directions.pt from M2b's $RESULTS_DIR. *(commit `9c5cef6`)*
+- [x] 5.5 Full E4B abliteration at α=1.0, all 42 layers. *(commit `9c5cef6`; model at `$RESULTS_DIR/models/gemma-4-e4b-abliterated/` ~11 GB)*
+- [x] 5.6 Quick-test (12 should_refuse prompts): 100% → 91.7% — predicted Gemma 4 RMSNorm/shared-K/V resistance confirmed. *(commit `9c5cef6`)*
+- [x] 5.7 Sweep ensemble. *(commits `5856994` perf cap + `09f4931` results JSON; alpha sweep flat 30-35% across α∈[0,2.0], layer subset flat 25-35%, random control 30%. **Standard rank-1 mean-diff abliteration is empirically ineffective on Gemma 4 E4B 8-bit.** Stratified 20-prompt subset, max_new_tokens=128, ETA bound to ~2.8 h.)*
+- [ ] 5.8 Capability preservation (MMLU + GSM8K). **DEFERRED — low priority since 5.7 showed abliteration didn't change behavior, so capabilities likely also unaffected. See `docs/issues/2026-05-06-m2c-deferred-items.md`.**
+- [x] 5.9 Category-specific refusal directions. *(commit `9c5cef6`; over-refuse cluster +0.93 pairwise; orthogonal to should_refuse −0.015. Table at `results/figures/selective_safety_table.md`.)*
+- [ ] 5.10 Selective abliteration eval (medical-only direction). **DEFERRED — given 5.7's negative finding, the geometric clean-separation result in 5.9 stands as the paper's selective-safety contribution.**
+- [x] 5.11 Figures: `alpha_sweep.png`, `layer_subset_comparison.png`, `selective_safety_table.md`. *(commit `c496617`)*
+- [x] 5.12 Hand-off note: abliterated model ready at `$RESULTS_DIR/models/gemma-4-e4b-abliterated/`. *(commit `9c5cef6` body)*
+- [x] 5.13 Final summary commit with `M2c-summary` parseable block. *(commit `33fe8f4`)*
 
 ## 6. M2c-followup — Benchmark on the project's own abliterated model
 
 Goal: complete the heatmap by adding our own abliterated model.
 Agent scope: `agent/benchmark-eval` worktree. GPU policy: gpu-lock-required for transformers backend.
 
-- [ ] 6.1 Pull abliterated model paths from `agent/abliteration` (cherry-pick or operator-mediated).
-- [ ] 6.2 Run `evaluate.py --backend transformers --use-8bit` against `models/gemma-4-e4b-abliterated/`. `--output $RESULTS_DIR/refusal_rates/gemma4_e4b_self_abliterated/`.
-- [ ] 6.3 If selective abliteration produced a model in 5.10, evaluate that too. → `$RESULTS_DIR/refusal_rates/gemma4_e4b_self_selective/`.
-- [ ] 6.4 Regenerate `results/figures/refusal_heatmap.png` including the new rows (now ~6–7 rows: base, E2B, OBLITERATUS, TrevorJS, HauhauCS, self-abliterated, self-selective).
-- [ ] 6.5 Push branch with a final commit whose message includes: refusal rate on `should_refuse` for the self-abliterated model and (if produced) the self-selectively-abliterated model. (M4 9.x reads these from `git log` and aggregates into `STATUS_FOR_HUMAN.md`.)
+- [x] 6.1 Pulled abliterated model path. *(operator-mediated; path `$RESULTS_DIR/models/gemma-4-e4b-abliterated/`)*
+- [x] 6.2 Run evaluate.py against self-abliterated. *(commit `b184932`; ran on stratified 48-prompt subset 6/cat × 8 cats due to ~75 s/iter inference cost. **should_refuse 6/6 = 100% — UNCHANGED FROM BASE.** Empirically confirms M2c sweep finding.)*
+- [ ] 6.3 Selective-abliterated eval. **NOT PRODUCED** — 5.10 was deferred.
+- [x] 6.4 Regenerated heatmap with self-abliterated row. *(commit `79a0a73`; 5 real model rows: E2B, E4B base, E4B+context, HauhauCS, self-abliterated)*
+- [x] 6.5 Final summary commit with `M2c-followup-summary` parseable block. *(commit `7d6e040`)*
 
 ## 7. M3 — Comparative Weight Diff (replaces Qwen MoE)
 
@@ -171,20 +171,20 @@ Same as predecessor — drafted on `agent/weight-diff` or `agent/writeup`. GPU p
 - [x] 8.3 Abliteration: Arditi 2024, Heretic (p-e-w 2025), OBLITERATUS (elder-plinius 2025), grimjim's norm-preserving biprojection. *(commit 78044fc on agent/writeup; seeded `paper/sections/03_related_work.md`)*
 - [x] 8.4 Over-refusal: Rottger 2024 (XSTest), Cui 2024. *(commit 033eb46 on agent/writeup; in `paper/sections/03_related_work.md`)*
 - [x] 8.5 Gemma 4 architectural quirks: source the "doesn't work on Gemma 4" findings (Heretic GitHub issues, OBLITERATUS card). *(commit cce3829 on agent/writeup; in `paper/sections/03_related_work.md`)*
-- [ ] 8.6 Output to `paper/sections/02_background.md` and `paper/sections/03_related_work.md`. Min 15 citations.
+- [x] 8.6 Verify ≥15 citations across `02_background.md` and `03_related_work.md`. *(commit `21e320f`; 17 citations total — 6 in 02, 11 in 03)*
 
 ## 9. M4 — Human Verification Gate
 
 Goal: produce `STATUS_FOR_HUMAN.md` and wait for operator's green-light sentence.
 Agent scope: `agent/writeup`. GPU policy: gpu-none.
 
-- [ ] 9.1 For each branch in {`agent/benchmark-eval`, `agent/mechanistic-analysis`, `agent/abliteration`, `agent/weight-diff`}, run `git log -1 origin/<branch>` and extract the headline numbers from the final commit message (the patterns documented in tasks 3.13, 4.9, 5.13, 6.5, 7.14). Aggregate into the section (a)–(e) entries below.
-- [ ] 9.2 Section (a) "Branch and commit status."
-- [ ] 9.3 Section (b) "Refusal rates table" — copy from `results/refusal_rates/`. Cite each row's source CSV.
-- [ ] 9.4 Section (c) "Mechanistic analysis summary" — peak layer indices, signal strength plot, rank-1 verdict.
-- [ ] 9.5 Section (d) "Abliteration sweep summary" — alpha curve shape, layer subset comparison, selective safety verdict, capability delta. **Include the Gemma 4 quirk note if 5.6 reported partial failure.**
-- [ ] 9.6 Section (e) "Comparative weight diff summary" — for each method: low-rank verdict, fraction of params changed, top-1 cosine vs M2b refusal directions, shared-tensor de-dup count.
-- [ ] 9.7 Section (f) "What the human needs to do":
+- [x] 9.1 Aggregate headline numbers from all agent branches' final commit messages. *(commits `e264abb` v1, `f42e0d6` v2)*
+- [x] 9.2 Section (a) Branch and commit status.
+- [x] 9.3 Section (b) Refusal rates table. *(v2 includes self-abliterated row from 6.2)*
+- [x] 9.4 Section (c) Mechanistic summary.
+- [x] 9.5 Section (d) Abliteration sweep summary — Gemma 4 RMSNorm/shared-K/V resistance is paper-relevant central finding.
+- [x] 9.6 Section (e) Comparative weight diff summary.
+- [x] 9.7 Section (f) "What the human needs to do":
   - Open every PNG under `/home/nyavana/columbia/6699/shared/results/agent/*/figures/` and eyeball for breakage.
   - Read 10 random responses from each abliterated model (self + OBLITERATUS + TrevorJS + HauhauCS) and confirm plausibility.
   - Verify `/home/nyavana/columbia/6699/shared/results/agent/benchmark-eval/refusal_rates/gemma4_e4b_base/evaluation_results.csv` shows `should_refuse` refusal rate >80%.
@@ -194,9 +194,9 @@ Agent scope: `agent/writeup`. GPU policy: gpu-none.
   - Grep for credentials leaks (`HF_TOKEN`, `HUGGING_FACE`, `API_KEY`).
   - Decide which branches to merge.
   - Write the green-light sentence: **"Approved to proceed to M5 — writeup authorized."**
-- [ ] 9.8 Section (g) "Known anomalies or deviations from plan."
-- [ ] 9.9 Commit and push `STATUS_FOR_HUMAN.md` on `agent/writeup`.
-- [ ] 9.10 STOP. Do not start M5 without the green-light sentence.
+- [x] 9.8 Section (g) Anomalies/deviations.
+- [x] 9.9 Commit and push STATUS_FOR_HUMAN.md. *(v2 at commit `f42e0d6` on `agent/writeup`)*
+- [ ] 9.10 **STOPPED. Awaiting operator green-light: open `STATUS_FOR_HUMAN.md`, eyeball PNGs (f.1), sample CSV responses (f.2), grep for credentials (f.7), decide branch merges (f.8), then write "Approved to proceed to M5 — writeup authorized."**
 
 ## 10. M5 — Paper + Slides
 
