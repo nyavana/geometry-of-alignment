@@ -37,13 +37,17 @@ from src.benchmark.classify_refusal import classify_refusal
 
 def evaluate_with_llamacpp(server_url: str, model_name: str,
                            benchmark_path: str, output_path: str,
-                           request_timeout: float = 300.0) -> list[dict]:
+                           request_timeout: float = 300.0,
+                           limit: int = None) -> list[dict]:
     """
     Evaluate a model served by llama-server (upstream llama.cpp) on the benchmark.
 
     The server must already be running and have a GGUF model loaded; the `model_name`
     argument is sent in the OpenAI-compatible request payload as a label only — the
     server uses whichever model was loaded with -m at launch.
+
+    Args:
+        limit: if set, evaluate only the first N prompts (useful for smoke tests).
     """
     import requests
 
@@ -52,9 +56,13 @@ def evaluate_with_llamacpp(server_url: str, model_name: str,
     with open(benchmark_path) as f:
         benchmark = json.load(f)
 
+    prompts = benchmark["prompts"]
+    if limit is not None:
+        prompts = prompts[:limit]
+
     results = []
 
-    for prompt_entry in tqdm(benchmark["prompts"], desc="Evaluating"):
+    for prompt_entry in tqdm(prompts, desc="Evaluating"):
         prompts_to_test = [prompt_entry["prompt"]] + prompt_entry.get("variants", [])
 
         for variant_idx, prompt_text in enumerate(prompts_to_test):
@@ -92,19 +100,27 @@ def evaluate_with_llamacpp(server_url: str, model_name: str,
 # ──────────────────────────────────────────────
 
 def evaluate_with_transformers(model, tokenizer, benchmark_path: str,
-                               output_path: str) -> list[dict]:
+                               output_path: str,
+                               limit: int = None) -> list[dict]:
     """
     Evaluate a transformers model (e.g., after abliteration).
     Accepts pre-loaded model and tokenizer objects.
+
+    Args:
+        limit: if set, evaluate only the first N prompts (useful for smoke tests).
     """
     import torch
 
     with open(benchmark_path) as f:
         benchmark = json.load(f)
 
+    prompts = benchmark["prompts"]
+    if limit is not None:
+        prompts = prompts[:limit]
+
     results = []
 
-    for prompt_entry in tqdm(benchmark["prompts"], desc="Evaluating"):
+    for prompt_entry in tqdm(prompts, desc="Evaluating"):
         prompt_text = prompt_entry["prompt"]
 
         messages = [{"role": "user", "content": prompt_text}]
@@ -207,10 +223,13 @@ def main():
     parser.add_argument("--server-url", default="http://127.0.0.1:8088",
                         help="llama-server base URL (llamacpp backend; 8088 because Windows-side WSL2 binds 8080)")
     parser.add_argument("--use-8bit", action="store_true", help="Use 8-bit quantization (transformers)")
+    parser.add_argument("--limit", type=int, default=None,
+                        help="Evaluate only the first N prompts (useful for smoke tests)")
     args = parser.parse_args()
 
     if args.backend == "llamacpp":
-        evaluate_with_llamacpp(args.server_url, args.model, args.benchmark, args.output)
+        evaluate_with_llamacpp(args.server_url, args.model, args.benchmark, args.output,
+                               limit=args.limit)
     else:
         from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
         import torch
@@ -228,7 +247,8 @@ def main():
                 args.model, device_map="auto", torch_dtype=torch.bfloat16
             )
         model.eval()
-        evaluate_with_transformers(model, tokenizer, args.benchmark, args.output)
+        evaluate_with_transformers(model, tokenizer, args.benchmark, args.output,
+                                   limit=args.limit)
 
 
 if __name__ == "__main__":
