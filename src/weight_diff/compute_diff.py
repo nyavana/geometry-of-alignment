@@ -9,10 +9,12 @@ Usage:
         --output results/weight_diffs/gemma_obliteratus/
 """
 
+import sys
 import torch
 import json
 import argparse
 import numpy as np
+from datetime import datetime
 from pathlib import Path
 from safetensors import safe_open
 from tqdm import tqdm
@@ -39,8 +41,58 @@ def load_state_dict_from_safetensors(model_dir: str) -> dict:
     return state_dict
 
 
+def _check_compat(original: dict, modified: dict, modified_dir: str,
+                  output_dir: Path, strict: bool) -> bool:
+    """
+    Pre-flight key/shape compatibility check.
+
+    Asserts variant.keys ⊆ base.keys and that common keys have matching shapes.
+    Logs failures to <output_dir>/../.compat_log.md (one centralized log across
+    all variants in the same parent dir, e.g. results/weight_diffs/.compat_log.md).
+    Returns True if compatible. If strict and incompatible, returns False — caller
+    should exit nonzero rather than produce a corrupt diff. If not strict and
+    incompatible, logs and returns True so the caller proceeds with the
+    intersection (TrevorJS-style fallback per task 7.5).
+    """
+    base_keys = set(original.keys())
+    var_keys = set(modified.keys())
+    extra_in_variant = var_keys - base_keys
+    shape_mismatches = []
+    for k in base_keys & var_keys:
+        if original[k].shape != modified[k].shape:
+            shape_mismatches.append((k, tuple(original[k].shape), tuple(modified[k].shape)))
+
+    incompatible = bool(extra_in_variant) or bool(shape_mismatches)
+    if not incompatible:
+        return True
+
+    log_path = output_dir.parent / ".compat_log.md"
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(log_path, "a") as f:
+        f.write(f"\n## {datetime.now().isoformat(timespec='seconds')} — {modified_dir}\n\n")
+        f.write(f"- mode: {'strict' if strict else 'lenient'}\n")
+        f.write(f"- base keys: {len(base_keys)}\n")
+        f.write(f"- variant keys: {len(var_keys)}\n")
+        if extra_in_variant:
+            f.write(f"- variant has {len(extra_in_variant)} keys not in base: ")
+            f.write(", ".join(sorted(extra_in_variant)[:10]))
+            if len(extra_in_variant) > 10:
+                f.write(f", ... ({len(extra_in_variant) - 10} more)")
+            f.write("\n")
+        if shape_mismatches:
+            f.write(f"- {len(shape_mismatches)} shape mismatches:\n")
+            for k, s_orig, s_mod in shape_mismatches[:10]:
+                f.write(f"  - `{k}`: base={s_orig} vs variant={s_mod}\n")
+            if len(shape_mismatches) > 10:
+                f.write(f"  - ... ({len(shape_mismatches) - 10} more)\n")
+        f.write(f"- decision: {'ABORT (strict)' if strict else 'proceed with intersection'}\n")
+
+    print(f"Compatibility issues logged to {log_path}", file=sys.stderr)
+    return not strict
+
+
 def compute_weight_diffs(original_dir: str, modified_dir: str,
-                         output_dir: str) -> list[dict]:
+                         output_dir: str, strict: bool = False) -> list[dict]:
     """
     Layer-by-layer comparison of original vs modified model weights.
     Computes Frobenius norm, relative change, SVD rank for each parameter.
@@ -53,6 +105,9 @@ def compute_weight_diffs(original_dir: str, modified_dir: str,
 
     print("Loading modified model weights...")
     modified = load_state_dict_from_safetensors(modified_dir)
+
+    if not _check_compat(original, modified, modified_dir, output_dir, strict):
+        sys.exit(1)
 
     common_keys = set(original.keys()) & set(modified.keys())
     print(f"Common parameter tensors: {len(common_keys)}")
@@ -146,9 +201,15 @@ def main():
     parser.add_argument("--original", required=True, help="Original model directory")
     parser.add_argument("--modified", required=True, help="Modified model directory")
     parser.add_argument("--output", required=True, help="Output directory")
+    parser.add_argument("--strict", action="store_true",
+                        help="Fail (exit 1) on key/shape mismatch instead of proceeding "
+                             "with the intersection. Use for primary variants where a "
+                             "compatibility failure is a project-stopping signal "
+                             "(e.g. OBLITERATUS); omit for fallback-eligible variants "
+                             "(e.g. TrevorJS) — see task 7.5.")
     args = parser.parse_args()
 
-    compute_weight_diffs(args.original, args.modified, args.output)
+    compute_weight_diffs(args.original, args.modified, args.output, strict=args.strict)
 
 
 if __name__ == "__main__":

@@ -23,6 +23,7 @@ Usage:
 """
 
 import json
+import csv
 import argparse
 from pathlib import Path
 from tqdm import tqdm
@@ -144,12 +145,25 @@ def evaluate_with_transformers(model, tokenizer, benchmark_path: str,
 # ──────────────────────────────────────────────
 
 def _save_results(results: list[dict], output_path: str):
-    """Save results and print summary."""
+    """Save results (json + csv) and print summary."""
     output_path = Path(output_path)
     output_path.mkdir(parents=True, exist_ok=True)
-    with open(output_path / "evaluation_results.json", "w") as f:
+
+    json_path = output_path / "evaluation_results.json"
+    with open(json_path, "w") as f:
         json.dump(results, f, indent=2)
-    print(f"\nSaved {len(results)} results to {output_path / 'evaluation_results.json'}")
+
+    csv_path = output_path / "evaluation_results.csv"
+    if results:
+        fieldnames = ["prompt_id", "variant_idx", "category", "expected", "actual",
+                      "correct", "over_refusal", "under_refusal", "prompt", "response"]
+        with open(csv_path, "w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
+            writer.writeheader()
+            for row in results:
+                writer.writerow(row)
+
+    print(f"\nSaved {len(results)} results to {json_path} and {csv_path}")
     _print_summary(results)
 
 
