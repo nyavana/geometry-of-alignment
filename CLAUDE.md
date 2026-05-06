@@ -40,12 +40,23 @@ source .venv/bin/activate                          # Python env via the symlink
 
 ### If recreating the venv from scratch
 
-The shared venv was built with `python3.12 -m venv` and `pip install -r requirements.txt`. `llama-cpp-python` requires a C/C++ toolchain and `cmake`:
+The shared venv was built with `python3.12 -m venv` and `pip install -r requirements.txt`. Python deps are pre-built wheels — no Python-side toolchain required. For the GGUF backend (next subsection) you also need the system CUDA toolkit (`apt install nvidia-cuda-toolkit`) to provide cuBLAS/cuRT at runtime.
+
+### llama-server (GGUF backend)
+
+`evaluate.py --backend llamacpp` talks HTTP to upstream llama.cpp's `llama-server`. The CUDA-enabled build is already installed at `/home/nyavana/columbia/6699/shared/llama.cpp-cuda/` (built from source against `nvidia-cuda-toolkit`, sm_89 only); `shared/env.sh` prepends its `bin/` to `PATH` and exports `LD_LIBRARY_PATH` for the bundled `.so`s. Sourcing `shared/env.sh` makes `llama-server` resolve to the CUDA build (winning against brew's CPU-only one).
+
+Launch it with whatever GGUF you want to evaluate:
 
 ```bash
-pip install cmake
-CC=/usr/bin/gcc CXX=/usr/bin/g++ pip install -r requirements.txt
+llama-server -m path/to/model.gguf -ngl 99 --host 127.0.0.1 --port 8088
 ```
+
+(Port 8088, not the conventional 8080 — Windows-side WSL2 already binds 8080 on this host. `evaluate.py`'s default is still 8080, so pass `--server-url http://127.0.0.1:8088` when calling it.)
+
+The benchmark script then sends OpenAI-compatible chat completions to that endpoint.
+
+To rebuild from a newer llama.cpp release: `git clone https://github.com/ggml-org/llama.cpp ~/src/llama.cpp && cd ~/src/llama.cpp && cmake -B build -DGGML_CUDA=on -DCMAKE_CUDA_ARCHITECTURES=89 && cmake --build build -j$(nproc) && cmake --install build --prefix /home/nyavana/columbia/6699/shared/llama.cpp-cuda`.
 
 ## Running Modules
 
@@ -56,8 +67,8 @@ All modules run as Python module invocations from the project root. There is no 
 source /home/nyavana/columbia/6699/shared/env.sh
 source .venv/bin/activate
 
-# Benchmark evaluation (llama.cpp backend)
-python -m src.benchmark.evaluate --backend llamacpp --model <gguf_path> --benchmark data/benchmark_prompts.json --output results/<model_name>/
+# Benchmark evaluation (llama.cpp backend — requires llama-server running separately)
+python -m src.benchmark.evaluate --backend llamacpp --model <label> --server-url http://127.0.0.1:8088 --benchmark data/benchmark_prompts.json --output results/<model_name>/
 
 # Benchmark evaluation (transformers backend, for abliterated models)
 python -m src.benchmark.evaluate --backend transformers --model google/gemma-4-E4B-it --benchmark data/benchmark_prompts.json --output results/<model_name>/ --use-8bit
@@ -98,7 +109,7 @@ python -m src.weight_diff.svd_analysis --results results/weight_diffs/gemma_obli
 
 Four independent modules in `src/`, each runnable as a standalone pipeline:
 
-- **`src/benchmark/`** — Refusal evaluation pipeline. `evaluate.py` runs models (llama.cpp or transformers) on prompts from `data/benchmark_prompts.json`. `classify_refusal.py` uses regex-based two-stage classification (refusal patterns vs compliance patterns). `analyze_results.py` generates heatmaps and comparison charts.
+- **`src/benchmark/`** — Refusal evaluation pipeline. `evaluate.py` runs models against prompts from `data/benchmark_prompts.json` via two backends: `llama-server` (HTTP, GGUF) or `transformers` (in-process, HF safetensors). `classify_refusal.py` uses regex-based two-stage classification (refusal patterns vs compliance patterns). `analyze_results.py` generates heatmaps and comparison charts.
 
 - **`src/mechanistic/`** — Activation extraction and analysis. `extract_activations.py` hooks into transformer layers via `register_forward_hook`, collects residual stream outputs, and computes refusal directions (mean_refuse - mean_comply, normalized). `layer_analysis.py` runs PCA rank analysis and signal strength per layer. `visualize.py` produces UMAP/t-SNE projections. Key class: `ActivationCollector` manages hooks and stores activations on CPU.
 

@@ -27,15 +27,15 @@ The system SHALL classify model responses as `refuse` or `comply` using regex-ba
 - **THEN** it SHALL achieve at least 90% agreement with manual labels
 
 ### Requirement: Cross-model evaluation pipeline
-The system SHALL evaluate any model (via llama.cpp GGUF or transformers) on the full benchmark and produce a JSON results file containing per-prompt: `prompt_id`, `category`, `expected`, `actual`, `over_refusal` (boolean), `prompt`, and `response`.
+The system SHALL evaluate any model (via upstream llama.cpp `llama-server` over HTTP for GGUF, or `transformers` in-process for HF safetensors) on the full benchmark and produce a JSON results file containing per-prompt: `prompt_id`, `category`, `expected`, `actual`, `over_refusal` (boolean), `prompt`, and `response`.
 
-#### Scenario: Evaluate a GGUF model via llama.cpp
-- **WHEN** a GGUF model path and benchmark path are provided
-- **THEN** the system SHALL run each prompt through the model with temperature 0.1, classify the response, and save results to the specified output directory
+#### Scenario: Evaluate a GGUF model via llama-server
+- **WHEN** an operator has launched `llama-server` with a GGUF model and supplies the server URL plus a benchmark path
+- **THEN** the system SHALL POST each prompt to the server's `/v1/chat/completions` endpoint with temperature 0.1, classify the response, and save results to the specified output directory
 
 #### Scenario: Evaluate a transformers model (e.g., abliterated)
 - **WHEN** a transformers model object and tokenizer are provided
-- **THEN** the system SHALL run each prompt using `model.generate()`, classify the response, and save results in the same JSON format as the llama.cpp pipeline
+- **THEN** the system SHALL run each prompt using `model.generate()`, classify the response, and save results in the same JSON format as the llama-server pipeline
 
 #### Scenario: Evaluate the four-variant Gemma lineup
 - **WHEN** the operator runs the full benchmark sweep

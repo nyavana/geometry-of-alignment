@@ -1,13 +1,16 @@
 """
 Run models on the benchmark and classify responses as refuse/comply.
 Supports two backends:
-  - llama.cpp (GGUF models, fast, CPU or GPU)
+  - llama.cpp via llama-server (GGUF models; OpenAI-compatible HTTP API)
   - transformers (HuggingFace models, for abliterated models)
 
 Usage:
+    # Start llama-server first (in another terminal), e.g.:
+    #     llama-server -m model.gguf -ngl 99 --host 127.0.0.1 --port 8088
     python -m src.benchmark.evaluate \
         --backend llamacpp \
-        --model models/gemma-4-e4b-Q4.gguf \
+        --model gemma-4-e4b-it \
+        --server-url http://127.0.0.1:8088 \
         --benchmark data/benchmark_prompts.json \
         --output results/gemma-4-e4b-original/
 
@@ -28,23 +31,22 @@ from src.benchmark.classify_refusal import classify_refusal
 
 
 # ──────────────────────────────────────────────
-# Backend 1: llama.cpp
+# Backend 1: llama.cpp via llama-server
 # ──────────────────────────────────────────────
 
-def evaluate_with_llamacpp(model_path: str, benchmark_path: str,
-                           output_path: str, n_gpu_layers: int = -1,
-                           n_ctx: int = 2048) -> list[dict]:
+def evaluate_with_llamacpp(server_url: str, model_name: str,
+                           benchmark_path: str, output_path: str,
+                           request_timeout: float = 300.0) -> list[dict]:
     """
-    Evaluate a GGUF model on the benchmark using llama.cpp.
-    """
-    from llama_cpp import Llama
+    Evaluate a model served by llama-server (upstream llama.cpp) on the benchmark.
 
-    llm = Llama(
-        model_path=model_path,
-        n_gpu_layers=n_gpu_layers,
-        n_ctx=n_ctx,
-        verbose=False,
-    )
+    The server must already be running and have a GGUF model loaded; the `model_name`
+    argument is sent in the OpenAI-compatible request payload as a label only — the
+    server uses whichever model was loaded with -m at launch.
+    """
+    import requests
+
+    endpoint = server_url.rstrip("/") + "/v1/chat/completions"
 
     with open(benchmark_path) as f:
         benchmark = json.load(f)
@@ -55,15 +57,16 @@ def evaluate_with_llamacpp(model_path: str, benchmark_path: str,
         prompts_to_test = [prompt_entry["prompt"]] + prompt_entry.get("variants", [])
 
         for variant_idx, prompt_text in enumerate(prompts_to_test):
-            messages = [{"role": "user", "content": prompt_text}]
+            payload = {
+                "model": model_name,
+                "messages": [{"role": "user", "content": prompt_text}],
+                "max_tokens": 512,
+                "temperature": 0.1,
+            }
 
-            response = llm.create_chat_completion(
-                messages=messages,
-                max_tokens=512,
-                temperature=0.1,
-            )
-
-            response_text = response["choices"][0]["message"]["content"]
+            response = requests.post(endpoint, json=payload, timeout=request_timeout)
+            response.raise_for_status()
+            response_text = response.json()["choices"][0]["message"]["content"]
             is_refusal = classify_refusal(response_text)
 
             results.append({
@@ -183,15 +186,17 @@ def _print_summary(results: list[dict]):
 def main():
     parser = argparse.ArgumentParser(description="Evaluate model on over-refusal benchmark")
     parser.add_argument("--backend", choices=["llamacpp", "transformers"], required=True)
-    parser.add_argument("--model", required=True, help="Model path (GGUF or HF model ID)")
+    parser.add_argument("--model", required=True,
+                        help="HF model ID (transformers) or label sent to llama-server (llamacpp)")
     parser.add_argument("--benchmark", required=True, help="Path to benchmark_prompts.json")
     parser.add_argument("--output", required=True, help="Output directory for results")
-    parser.add_argument("--n-gpu-layers", type=int, default=-1, help="GPU layers for llama.cpp")
+    parser.add_argument("--server-url", default="http://127.0.0.1:8088",
+                        help="llama-server base URL (llamacpp backend; 8088 because Windows-side WSL2 binds 8080)")
     parser.add_argument("--use-8bit", action="store_true", help="Use 8-bit quantization (transformers)")
     args = parser.parse_args()
 
     if args.backend == "llamacpp":
-        evaluate_with_llamacpp(args.model, args.benchmark, args.output, args.n_gpu_layers)
+        evaluate_with_llamacpp(args.server_url, args.model, args.benchmark, args.output)
     else:
         from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
         import torch

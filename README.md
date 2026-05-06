@@ -68,9 +68,20 @@ To bootstrap the shared venv from scratch:
 ```bash
 python3.12 -m venv /home/nyavana/columbia/6699/shared/.venv
 source /home/nyavana/columbia/6699/shared/.venv/bin/activate
-pip install cmake                                  # required by llama-cpp-python build
-CC=/usr/bin/gcc CXX=/usr/bin/g++ pip install -r requirements.txt
+pip install -r requirements.txt
 ```
+
+The GGUF inference path uses upstream llama.cpp's `llama-server`, built from source into `/home/nyavana/columbia/6699/shared/llama.cpp-cuda/` (CUDA via `apt install nvidia-cuda-toolkit`, sm_89 only). `shared/env.sh` prepends its `bin/` to `PATH` and exports `LD_LIBRARY_PATH` for the bundled `.so`s — so once `shared/env.sh` is sourced, `llama-server` resolves to the CUDA build. To rebuild from a newer release: `git clone https://github.com/ggml-org/llama.cpp ~/src/llama.cpp && cd ~/src/llama.cpp && cmake -B build -DGGML_CUDA=on -DCMAKE_CUDA_ARCHITECTURES=89 && cmake --build build -j$(nproc) && cmake --install build --prefix /home/nyavana/columbia/6699/shared/llama.cpp-cuda`.
+
+Launch with the GGUF you want to evaluate:
+
+```bash
+llama-server -m path/to/model.gguf -ngl 99 --host 127.0.0.1 --port 8088
+```
+
+(Use port 8088, not 8080 — Windows-side WSL2 already binds 8080 on this host.)
+
+`evaluate.py --backend llamacpp` then sends OpenAI-compatible chat completions to that endpoint; pass `--server-url http://127.0.0.1:8088` to override the 8080 default.
 
 Hardware used during development:
 
@@ -86,10 +97,11 @@ Each module is invoked from the project root.
 ### Benchmark Evaluation
 
 ```bash
-# llama.cpp backend (GGUF models)
+# llama.cpp backend (GGUF models — start llama-server first; see Setup above)
 python -m src.benchmark.evaluate \
     --backend llamacpp \
-    --model <gguf_path> \
+    --model <label> \
+    --server-url http://127.0.0.1:8088 \
     --benchmark data/benchmark_prompts.json \
     --output results/<model_name>/
 

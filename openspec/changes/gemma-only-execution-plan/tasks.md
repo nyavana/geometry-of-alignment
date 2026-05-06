@@ -9,7 +9,7 @@ This is the single source of truth for milestones M0–M5 of the project. M0 and
 | Branch | Worktree path | GPU policy |
 |---|---|---|
 | `agent/env-bootstrap` | `../gb-env/` | gpu-none |
-| `agent/benchmark-eval` | `../gb-bench/` | gpu-none (llama.cpp on CPU) |
+| `agent/benchmark-eval` | `../gb-bench/` | gpu-none (llama-server CPU mode) or gpu-lock-required (llama-server -ngl) |
 | `agent/mechanistic-analysis` | `../gb-mech/` | gpu-lock-required |
 | `agent/abliteration` | `../gb-ablit/` | gpu-lock-required |
 | `agent/weight-diff` | `../gb-wdiff/` | gpu-none (CPU-only) |
@@ -47,7 +47,7 @@ Reference only.
 ## 3. M2a — Benchmark Evaluation Pipeline
 
 Goal: run benchmark evaluation across the new model lineup.
-Agent scope: `agent/benchmark-eval` worktree (`../gb-bench/`). GPU policy: gpu-none for llama.cpp; gpu-lock-required for transformers backend.
+Agent scope: `agent/benchmark-eval` worktree (`../gb-bench/`). GPU policy: gpu-none if `llama-server` is launched without `-ngl` (CPU only) and for the OpenAI-compatible HTTP client; gpu-lock-required when `llama-server` is launched with `-ngl` to offload layers, and for the transformers backend.
 
 **Model lineup (replacing the predecessor's Qwen rows):**
 - `google/gemma-4-E4B-it` (base, GGUF + transformers)
@@ -58,8 +58,9 @@ Agent scope: `agent/benchmark-eval` worktree (`../gb-bench/`). GPU policy: gpu-n
 - (eventually) the project's own M2c abliterated E4B — added in section 6 below
 
 - [ ] 3.1 In `../gb-bench/`, rebase onto the `m1-benchmark-frozen` tag
-- [ ] 3.2 Verify `src/benchmark/{evaluate.py,classify_refusal.py,analyze_results.py}` are runnable; fill any scaffolding gaps. `evaluate.py` MUST already support both `--backend llamacpp` and `--backend transformers` (per the existing `benchmark-evaluation` spec).
-- [ ] 3.3 Smoke test: run `evaluate.py` on 10 prompts against base Gemma 4 E4B GGUF. Commit smoke log to `results/refusal_rates/.smoke/`.
+- [ ] 3.2 Verify `src/benchmark/{evaluate.py,classify_refusal.py,analyze_results.py}` are runnable; fill any scaffolding gaps. `evaluate.py` MUST support both `--backend llamacpp` (HTTP client to `llama-server`, with `--server-url`) and `--backend transformers` (per the `benchmark-evaluation` spec).
+- [x] 3.2.1 Install upstream llama.cpp's `llama-server` binary. *(Done from `main`: built from source against `apt install nvidia-cuda-toolkit` (CUDA 12.0) with `-DGGML_CUDA=on -DCMAKE_CUDA_ARCHITECTURES=89`, installed to `/home/nyavana/columbia/6699/shared/llama.cpp-cuda/`. PATH + LD_LIBRARY_PATH are wired through `shared/env.sh`, so every worktree picks it up on `source shared/env.sh`. `llama-server --list-devices` confirms `CUDA0: NVIDIA GeForce RTX 4070 Ti SUPER (16375 MiB)`.)*
+- [ ] 3.3 Smoke test: launch `llama-server -m /home/nyavana/columbia/6699/shared/model/gemma-4-E4B-it.Q8_0.gguf -ngl 99 --host 127.0.0.1 --port 8088` (8088 because Windows-side WSL2 binds 8080), then run `evaluate.py --backend llamacpp --server-url http://127.0.0.1:8088` on 10 prompts against base Gemma 4 E4B GGUF. Verified end-to-end working from `main` (43/43 layers offloaded to GPU, OpenAI chat-completions endpoint returns expected output). Commit smoke log to `results/refusal_rates/.smoke/`.
 - [ ] 3.4 Manually label 50 sampled responses; iterate `classify_refusal.py` patterns until ≥90% agreement.
 - [ ] 3.5 Full evaluation: base `google/gemma-4-E4B-it` (GGUF). Output to `results/refusal_rates/gemma4_e4b_base.csv`.
 - [ ] 3.6 Full evaluation: `google/gemma-4-E2B-it` (BF16, validation). Output to `results/refusal_rates/gemma4_e2b_base.csv`.

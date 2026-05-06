@@ -2,7 +2,6 @@ torch>=2.4.0
 transformers>=4.50.0
 bitsandbytes>=0.45.0
 accelerate>=1.2.0
-llama-cpp-python>=0.3.0
 scikit-learn>=1.5.0
 umap-learn>=0.5.0
 matplotlib>=3.9.0
@@ -12,3 +11,6 @@ pandas>=2.2.0
 numpy>=1.26.0
 tqdm
 safetensors
+# gguf: must come from llama.cpp HEAD because pypi releases lag — convert_hf_to_gguf.py
+# references symbols (e.g. MODEL_ARCH.GEMMA4) that aren't in the latest pypi build yet.
+gguf @ git+https://github.com/ggml-org/llama.cpp.git#subdirectory=gguf-py
