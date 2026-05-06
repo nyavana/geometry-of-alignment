@@ -34,6 +34,19 @@ def get_layer_type(layer_idx: int) -> str:
 def compute_signal_strength(refuse_acts: dict, comply_acts: dict) -> dict:
     """
     For each layer, compute how well refuse/comply are separated.
+
+    The canonical signal-strength metric (M2b 4.5) is a Cohen's-d-style
+    separation along the difference-in-means direction:
+
+        d_dir = (mean_r - mean_c) / ||mean_r - mean_c||
+        signal = ||mean_r - mean_c||
+                  / sqrt( (std(refuse_proj)^2 + std(comply_proj)^2) / 2 )
+
+    where ``refuse_proj``/``comply_proj`` are the per-row projections of the
+    activations onto ``d_dir``. This is exactly equivalent to univariate
+    Cohen's d of those projections, since the numerator
+    ``mean(refuse_proj) - mean(comply_proj) == ||mean_r - mean_c||`` by the
+    choice of ``d_dir``.
     """
     results = {}
 
@@ -48,17 +61,28 @@ def compute_signal_strength(refuse_acts: dict, comply_acts: dict) -> dict:
             mean_r.unsqueeze(0), mean_c.unsqueeze(0)
         ).item()
 
-        direction = diff / diff.norm()
+        direction = diff / (diff.norm() + 1e-12)
         refuse_proj = (refuse_acts[layer_idx] @ direction).numpy()
         comply_proj = (comply_acts[layer_idx] @ direction).numpy()
 
+        # Legacy "separation score": z-score against pooled-everything std.
         all_proj = np.concatenate([refuse_proj, comply_proj])
         separation = (refuse_proj.mean() - comply_proj.mean()) / (np.std(all_proj) + 1e-8)
 
+        # Canonical Cohen's-d-style signal strength along the diff-in-means
+        # direction (M2b 4.5 spec).
+        std_r = float(np.std(refuse_proj, ddof=0))
+        std_c = float(np.std(comply_proj, ddof=0))
+        pooled = float(np.sqrt((std_r ** 2 + std_c ** 2) / 2.0))
+        cohens_d = signal_norm / (pooled + 1e-12)
+
         results[layer_idx] = {
-            "signal_norm": signal_norm,
-            "cosine_similarity": cosine_sim,
-            "separation_score": separation,
+            "signal_norm": float(signal_norm),
+            "cosine_similarity": float(cosine_sim),
+            "separation_score": float(separation),
+            "cohens_d": float(cohens_d),
+            "std_refuse_proj": float(std_r),
+            "std_comply_proj": float(std_c),
             "layer_type": get_layer_type(layer_idx),
         }
 
@@ -122,6 +146,60 @@ def plot_signal_strength(results: dict, output_dir: str = "results/figures"):
     plt.close()
 
 
+def plot_signal_vs_layer(results: dict, output_dir: str = "results/figures"):
+    """
+    Canonical M2b 4.5 figure: Cohen's-d-style signal strength per layer with
+    sliding vs global attention layers marked distinctly. Saved as
+    ``signal_vs_layer.png``.
+    """
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+
+    layers = sorted(results.keys())
+    cohens = [results[l]["cohens_d"] for l in layers]
+
+    sliding_x = [l for l in layers if results[l]["layer_type"] == "sliding"]
+    sliding_y = [results[l]["cohens_d"] for l in sliding_x]
+    global_x = [l for l in layers if results[l]["layer_type"] == "global"]
+    global_y = [results[l]["cohens_d"] for l in global_x]
+
+    fig, ax = plt.subplots(figsize=(14, 5))
+    # Connecting line so the trajectory across layers is legible.
+    ax.plot(layers, cohens, color="#888888", linewidth=1.0, alpha=0.6,
+            zorder=1, label="_nolegend_")
+    ax.scatter(sliding_x, sliding_y, color="#2196F3", s=55, marker="o",
+               edgecolor="black", linewidth=0.4, zorder=2,
+               label="Sliding attention (35 layers)")
+    ax.scatter(global_x, global_y, color="#FF5722", s=110, marker="^",
+               edgecolor="black", linewidth=0.6, zorder=3,
+               label="Global attention (7 layers)")
+
+    peak_layer = max(layers, key=lambda l: results[l]["cohens_d"])
+    ax.annotate(
+        f"peak: layer {peak_layer}\nd={results[peak_layer]['cohens_d']:.2f}",
+        xy=(peak_layer, results[peak_layer]["cohens_d"]),
+        xytext=(8, -16),
+        textcoords="offset points",
+        fontsize=9,
+        color="black",
+    )
+
+    ax.set_xlabel("Layer index")
+    ax.set_ylabel(r"Signal strength (Cohen's $d$)")
+    ax.set_title(
+        "Refusal-vs-comply signal per layer — Gemma 4 E4B (8-bit)\n"
+        r"$d = \|\mu_R - \mu_C\| \,/\, \sqrt{(\sigma_R^2 + \sigma_C^2)/2}$ "
+        "along the diff-in-means direction"
+    )
+    ax.set_xticks(range(0, max(layers) + 1, 2))
+    ax.grid(axis="y", alpha=0.25)
+    ax.legend(loc="best")
+
+    plt.tight_layout()
+    plt.savefig(f"{output_dir}/signal_vs_layer.png", dpi=150)
+    print(f"Saved to {output_dir}/signal_vs_layer.png")
+    plt.close()
+
+
 def plot_rank_analysis(rank_results: dict, output_dir: str = "results/figures"):
     """Plot effective rank and top-1 energy across layers."""
     Path(output_dir).mkdir(parents=True, exist_ok=True)
@@ -171,14 +249,28 @@ def main():
     print("\nComputing signal strength...")
     signal_results = compute_signal_strength(refuse_acts, comply_acts)
     plot_signal_strength(signal_results, args.output)
+    plot_signal_vs_layer(signal_results, args.output)
 
     # Print summary
     sliding_sep = [v["separation_score"] for v in signal_results.values()
                    if v["layer_type"] == "sliding"]
     global_sep = [v["separation_score"] for v in signal_results.values()
                   if v["layer_type"] == "global"]
+    sliding_d = [v["cohens_d"] for v in signal_results.values()
+                 if v["layer_type"] == "sliding"]
+    global_d = [v["cohens_d"] for v in signal_results.values()
+                if v["layer_type"] == "global"]
+    layers_sorted = sorted(signal_results.keys())
+    top3 = sorted(layers_sorted, key=lambda l: signal_results[l]["cohens_d"],
+                  reverse=True)[:3]
     print(f"\nMean separation — sliding: {np.mean(sliding_sep):.3f}, "
           f"global: {np.mean(global_sep):.3f}")
+    print(f"Mean Cohen's d — sliding: {np.mean(sliding_d):.3f}, "
+          f"global: {np.mean(global_d):.3f}, "
+          f"gap: {np.mean(global_d) - np.mean(sliding_d):+.3f}")
+    print("Top-3 layers by Cohen's d: "
+          + ", ".join(f"L{l}={signal_results[l]['cohens_d']:.3f}"
+                      f"({signal_results[l]['layer_type']})" for l in top3))
 
     # Rank analysis
     print("\nComputing rank analysis...")
