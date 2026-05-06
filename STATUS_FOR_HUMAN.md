@@ -261,3 +261,41 @@ Sources for each number (all paths absolute under `/home/nyavana/columbia/6699/`
 - Mechanistic peak/rank-1: `shared/results/agent/mechanistic-analysis/` (signal_vs_layer.png, rank_analysis.png, refusal_directions.pt). Source commits `1d5c590`, `d17afb4`, `358abf5`.
 - Sweep numbers: `shared/results/agent/abliteration/ablation_results/sweep_results.json` and `category_cosine_heatmap.png`. Source commit `33fe8f4`.
 - Weight-diff numbers: `shared/results/agent/weight-diff/weight_diffs/cross_method_cosine_table_dedup.csv` and `refusal_direction_vs_singular_vector.csv`. Source commit `11f863e`.
+
+---
+
+## (i) Fresh-session pickup
+
+If a new Claude Code session opens this repo without prior context, here is the decision tree:
+
+**1. Is the green-light sentence written below this section?** (Look for the literal string `Approved to proceed to M5 — writeup authorized.`)
+
+   - **No → Operator review pending.** Do nothing autonomous. Surface to the user that M4 is awaiting their checklist completion (items f.1, f.2, f.7, f.8). Do not start M5.
+
+   - **Yes → M5 paper drafting unblocks.** Read `openspec/changes/gemma-only-execution-plan/tasks.md` section 10 (M5 plan); dispatch agents per the plan, citing numbers from this file's section (h) and source paths from this section's bullet list. Default model for M5 dispatches is `claude-opus-4-7` (writing/judgment). Per-section M5 work fits comfortably in single ~30-min agent dispatches.
+
+**2. Headline numbers are in section (h) above.** Every M5 numeric claim must trace to a CSV/JSON/figure path listed there. The corresponding `paper/sources.md` (M5 task 10.11) is not yet created — produce it as part of M5.
+
+**3. Existing paper-section seeds:** `paper/sections/02_background.md` (RLHF/DPO/CAI/RepE), `paper/sections/03_related_work.md` (abliteration lineage + over-refusal benchmarks + Gemma 4 quirks). 17 citations already present; M5 sections 1, 4, 5, 6, 7, 8, 9 still need to be written.
+
+**4. Known-failure recovery paths (if M5 needs the missing data):**
+   - OBLITERATUS behavioral row: GGUF backend crashes on Harmony tokens; fall back to `transformers --use-8bit` on its bf16 safetensors (`shared/model/OBLITERATUS-gemma-4-E4B-it-OBLITERATED/`). Expect ~75–150 s/prompt. Run on the same stratified 48-prompt subset at `shared/results/agent/benchmark-eval/stratified_50.json` for ~1–2 h.
+   - TrevorJS behavioral row: same recipe (transformers + 8-bit + stratified subset).
+   - 5.10 selective abliteration eval: dispatch a follow-up agent that uses category-direction `.pt` files at `shared/results/agent/abliteration/activations/` and runs `selective_safety.py` (script exists) — expect a similar negative result given the M2c sweep, but worth recording.
+
+These are nice-to-have for paper completeness; the core paper claim (Section 7 weight-diff geometry + Section 6 negative abliteration finding) doesn't require them.
+
+**5. Operational notes for fresh-session agents:**
+   - Background `Agent` invocations have a soft ~45–50 min runtime cap. Use `nohup` + `flock` for anything longer (see CLAUDE.md "Subagent runtime budget").
+   - Gemma 4 inference: GGUF via llama-server is fast (~20 s/prompt); transformers 8-bit is slow (~75–150 s/prompt). See CLAUDE.md "Inference cost on Gemma 4 E4B".
+   - `$RESULTS_DIR` is per-branch; cross-branch reads use absolute paths under `shared/results/agent/<branch>/`. All branches are now merged to `main`, so the latest code lives in `main` and per-branch results still live where each agent wrote them.
+
+---
+
+## (j) Operator green-light
+
+Write the sentence below verbatim once items f.1, f.2, f.7, f.8 are checked:
+
+> Approved to proceed to M5 — writeup authorized.
+
+(Until that sentence appears in this file, M5 dispatches must not start.)

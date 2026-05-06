@@ -153,6 +153,27 @@ When dispatching subagents to keep the main thread's context clean, choose the m
 
 The dispatch contract field `(7) model` (per `openspec/.../specs/autonomous-execution/spec.md` and `tasks.md` preamble) records the choice on every dispatch. When you override the default for a section, add a one-line rationale in the dispatch prompt so a later replay can see why.
 
+## Subagent runtime budget
+
+Background `Agent` invocations have an observed soft cap of ~45–50 minutes of wall-clock work before the harness terminates them (encountered repeatedly in May 2026 sessions: a long-polling agent dies and emits a "completed" notification with a half-finished summary). Plan dispatches accordingly:
+
+- Aim each agent at ≤30–40 min of intended work.
+- For longer evals, have the agent **launch a `nohup` background process** (with the GPU lock held via `flock` inside the nohup wrapper, not via `scripts/gpu_lock.sh acquire` from the agent's foreground), then exit early. The detached process survives the agent's death; a follow-up agent picks up the result file later.
+- Do not write self-watching agents that poll for hours — they will die mid-poll and leave behind ghost-monitor `<task-notification>` messages in the parent context.
+- The orchestrator (main thread) should monitor long-running detached processes via `ScheduleWakeup` heartbeats, not by keeping an agent alive.
+
+This pattern is what `/tmp/full_pipeline_3.6_to_3.13.sh` and `/tmp/m2c-sweep.log` use — the python evaluator process is `nohup`'d under a `flock` guard so the GPU lock and the work both outlive the dispatch.
+
+## Inference cost on Gemma 4 E4B
+
+Empirical per-prompt latency observed on the 4070 Ti Super:
+
+- **`llama-server -ngl 99` on a Q8_0 GGUF** — ~18–25 s/prompt (max_new_tokens=512). This is the fast path; use it whenever a GGUF is available.
+- **`transformers --use-8bit` (bitsandbytes)** — ~75–150 s/prompt (max_new_tokens=512). 5–8× slower than llama-server. Avoid for full 344-prompt runs unless you have ~5 hours of GPU time. For sweeps, drop `max_new_tokens` to 128 (refusal classification needs ≤50 tokens of output) and use a stratified subset (~20–50 prompts).
+- **`transformers` BF16 on E2B (~9.5 GB)** — ~24 s/prompt; fits in 16 GB VRAM, faster than 8-bit on E4B.
+
+OBLITERATUS GGUF specifically emits raw Harmony-format `<|channel>` tokens that crash llama-server's chat parser on the second prompt — fall back to its bf16 safetensors via `transformers --use-8bit` (slow but works), or the GGUF with a chat-template override that strips Harmony markers. See `docs/issues/2026-05-06-obliteratus-eval-fail.md`.
+
 ## Documenting unresolvable issues
 
 When you hit a problem that isn't quickly fixable or workable around — environment or dependency conflicts, model-loading failures, agent-dispatch race conditions, anything that would block the next step — drop a short markdown note under `docs/issues/` (create the directory if it doesn't exist). Capture: symptom, what you tried, what you observed, and either the eventual fix or the open question that's still blocking. This gives the next session (or operator) a starting point and prevents re-walking the same dead end.
