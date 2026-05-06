@@ -69,13 +69,19 @@ def evaluate_with_llamacpp(server_url: str, model_name: str,
             payload = {
                 "model": model_name,
                 "messages": [{"role": "user", "content": prompt_text}],
-                "max_tokens": 512,
+                "max_tokens": 2048,
                 "temperature": 0.1,
             }
 
             response = requests.post(endpoint, json=payload, timeout=request_timeout)
             response.raise_for_status()
-            response_text = response.json()["choices"][0]["message"]["content"]
+            resp_json = response.json()
+            message = resp_json["choices"][0]["message"]
+            # Gemma 4 can return an empty "content" when extended thinking uses
+            # all tokens; fall back to "reasoning_content" so we don't mis-classify
+            # real responses as refusals.  If both are empty, the model truly
+            # produced no output and we treat that as a soft-refuse.
+            response_text = message.get("content") or message.get("reasoning_content", "")
             is_refusal = classify_refusal(response_text)
 
             results.append({
