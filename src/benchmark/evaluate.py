@@ -38,7 +38,8 @@ from src.benchmark.classify_refusal import classify_refusal
 def evaluate_with_llamacpp(server_url: str, model_name: str,
                            benchmark_path: str, output_path: str,
                            request_timeout: float = 300.0,
-                           limit: int = None) -> list[dict]:
+                           limit: int = None,
+                           base_only: bool = False) -> list[dict]:
     """
     Evaluate a model served by llama-server (upstream llama.cpp) on the benchmark.
 
@@ -48,6 +49,7 @@ def evaluate_with_llamacpp(server_url: str, model_name: str,
 
     Args:
         limit: if set, evaluate only the first N prompts (useful for smoke tests).
+        base_only: if True, skip variants and only evaluate the base prompt (variant_idx=0).
     """
     import requests
 
@@ -63,7 +65,10 @@ def evaluate_with_llamacpp(server_url: str, model_name: str,
     results = []
 
     for prompt_entry in tqdm(prompts, desc="Evaluating"):
-        prompts_to_test = [prompt_entry["prompt"]] + prompt_entry.get("variants", [])
+        if base_only:
+            prompts_to_test = [prompt_entry["prompt"]]
+        else:
+            prompts_to_test = [prompt_entry["prompt"]] + prompt_entry.get("variants", [])
 
         for variant_idx, prompt_text in enumerate(prompts_to_test):
             payload = {
@@ -107,13 +112,15 @@ def evaluate_with_llamacpp(server_url: str, model_name: str,
 
 def evaluate_with_transformers(model, tokenizer, benchmark_path: str,
                                output_path: str,
-                               limit: int = None) -> list[dict]:
+                               limit: int = None,
+                               base_only: bool = False) -> list[dict]:
     """
     Evaluate a transformers model (e.g., after abliteration).
     Accepts pre-loaded model and tokenizer objects.
 
     Args:
         limit: if set, evaluate only the first N prompts (useful for smoke tests).
+        base_only: if True, skip variants and only evaluate the base prompt.
     """
     import torch
 
@@ -231,11 +238,13 @@ def main():
     parser.add_argument("--use-8bit", action="store_true", help="Use 8-bit quantization (transformers)")
     parser.add_argument("--limit", type=int, default=None,
                         help="Evaluate only the first N prompts (useful for smoke tests)")
+    parser.add_argument("--base-only", action="store_true",
+                        help="Skip variants, evaluate only the canonical base prompt per entry")
     args = parser.parse_args()
 
     if args.backend == "llamacpp":
         evaluate_with_llamacpp(args.server_url, args.model, args.benchmark, args.output,
-                               limit=args.limit)
+                               limit=args.limit, base_only=args.base_only)
     else:
         from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
         import torch
@@ -254,7 +263,7 @@ def main():
             )
         model.eval()
         evaluate_with_transformers(model, tokenizer, args.benchmark, args.output,
-                                   limit=args.limit)
+                                   limit=args.limit, base_only=args.base_only)
 
 
 if __name__ == "__main__":
