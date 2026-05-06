@@ -170,7 +170,7 @@ Same as predecessor — drafted on `agent/weight-diff` or `agent/writeup`. GPU p
 - [x] 8.2 Representation engineering (Zou 2023), linear representation hypothesis.
 - [x] 8.3 Abliteration: Arditi 2024, Heretic (p-e-w 2025), OBLITERATUS (elder-plinius 2025), grimjim's norm-preserving biprojection.
 - [x] 8.4 Over-refusal: Rottger 2024 (XSTest), Cui 2024.
-- [ ] 8.5 Gemma 4 architectural quirks: source the "doesn't work on Gemma 4" findings (Heretic GitHub issues, OBLITERATUS card).
+- [x] 8.5 Gemma 4 architectural quirks: source the "doesn't work on Gemma 4" findings (Heretic GitHub issues, OBLITERATUS card).
 - [ ] 8.6 Output to `paper/sections/02_background.md` and `paper/sections/03_related_work.md`. Min 15 citations.
 
 ## 9. M4 — Human Verification Gate
