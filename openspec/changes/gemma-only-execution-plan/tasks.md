@@ -4,6 +4,10 @@ This is the single source of truth for milestones M0–M5 of the project. M0 and
 
 **Dispatch contract** (carried forward from `autonomous-agent-pivot`): every agent dispatch SHALL include (1) absolute worktree path, (2) branch name, (3) a specific section ID from this file, (4) GPU policy, (5) commit-and-push protocol, (6) stop condition at section boundary.
 
+**Environment activation** (every dispatched agent's first commands): `source /home/nyavana/columbia/6699/shared/env.sh && source .venv/bin/activate`. Without this, `python` is not on PATH.
+
+**Path conventions:** Artifact paths written below as `results/...` resolve to `$RESULTS_DIR/...` (i.e., `/home/nyavana/columbia/6699/shared/results/agent/<branch>/...`), which is per-branch and outside any worktree's git repo. Cross-branch reads (e.g., M2c reading M2b's output) use the absolute form `/home/nyavana/columbia/6699/shared/results/agent/<source-branch>/...`. The `.gitignore` allowlist also permits a redundant in-repo copy of small handoff artifacts (refusal directions, summary JSONs/CSVs, headline figures) for git-based traceability — but the source of truth remains `$RESULTS_DIR`.
+
 **Worktrees** (created in M0, names preserved):
 
 | Branch | Worktree path | GPU policy |
@@ -57,16 +61,16 @@ Agent scope: `agent/benchmark-eval` worktree (`../gb-bench/`). GPU policy: gpu-n
 - `HauhauCS/Gemma-4-E4B-Uncensored-HauhauCS-Aggressive` (GGUF Q8_K_P)
 - (eventually) the project's own M2c abliterated E4B — added in section 6 below
 
-- [ ] 3.1 In `../gb-bench/`, rebase onto the `m1-benchmark-frozen` tag
+- [ ] 3.1 In `../gb-bench/`, rebase onto `origin/main` (`m1-benchmark-frozen` is local-only and predates the llama-server backend swap; `origin/main` carries that swap, the prompt additions, and the path-convention preamble above)
 - [ ] 3.2 Verify `src/benchmark/{evaluate.py,classify_refusal.py,analyze_results.py}` are runnable; fill any scaffolding gaps. `evaluate.py` MUST support both `--backend llamacpp` (HTTP client to `llama-server`, with `--server-url`) and `--backend transformers` (per the `benchmark-evaluation` spec).
 - [x] 3.2.1 Install upstream llama.cpp's `llama-server` binary. *(Done from `main`: built from source against `apt install nvidia-cuda-toolkit` (CUDA 12.0) with `-DGGML_CUDA=on -DCMAKE_CUDA_ARCHITECTURES=89`, installed to `/home/nyavana/columbia/6699/shared/llama.cpp-cuda/`. PATH + LD_LIBRARY_PATH are wired through `shared/env.sh`, so every worktree picks it up on `source shared/env.sh`. `llama-server --list-devices` confirms `CUDA0: NVIDIA GeForce RTX 4070 Ti SUPER (16375 MiB)`.)*
 - [ ] 3.3 Smoke test: launch `llama-server -m /home/nyavana/columbia/6699/shared/model/gemma-4-E4B-it.Q8_0.gguf -ngl 99 --host 127.0.0.1 --port 8088` (8088 because Windows-side WSL2 binds 8080), then run `evaluate.py --backend llamacpp --server-url http://127.0.0.1:8088` on 10 prompts against base Gemma 4 E4B GGUF. Verified end-to-end working from `main` (43/43 layers offloaded to GPU, OpenAI chat-completions endpoint returns expected output). Commit smoke log to `results/refusal_rates/.smoke/`.
 - [ ] 3.4 Manually label 50 sampled responses; iterate `classify_refusal.py` patterns until ≥90% agreement.
-- [ ] 3.5 Full evaluation: base `google/gemma-4-E4B-it` (GGUF). Output to `results/refusal_rates/gemma4_e4b_base.csv`.
-- [ ] 3.6 Full evaluation: `google/gemma-4-E2B-it` (BF16, validation). Output to `results/refusal_rates/gemma4_e2b_base.csv`.
-- [ ] 3.7 Full evaluation: `OBLITERATUS/gemma-4-E4B-it-OBLITERATED` (GGUF Q8_0). Output to `results/refusal_rates/gemma4_e4b_obliteratus.csv`.
-- [ ] 3.8 Full evaluation: `TrevorJS/gemma-4-E4B-it-uncensored` (bf16 via transformers, gpu-lock-required). Output to `results/refusal_rates/gemma4_e4b_trevorjs.csv`.
-- [ ] 3.9 Full evaluation: `HauhauCS/Gemma-4-E4B-Uncensored-HauhauCS-Aggressive` (GGUF Q8_K_P). Output to `results/refusal_rates/gemma4_e4b_hauhau.csv`.
+- [ ] 3.5 Full evaluation: base `google/gemma-4-E4B-it` (GGUF). `--output $RESULTS_DIR/refusal_rates/gemma4_e4b_base/` (writes `evaluation_results.{json,csv}`).
+- [ ] 3.6 Full evaluation: `google/gemma-4-E2B-it` (BF16, validation). `--output $RESULTS_DIR/refusal_rates/gemma4_e2b_base/`.
+- [ ] 3.7 Full evaluation: `OBLITERATUS/gemma-4-E4B-it-OBLITERATED` (GGUF Q8_0). `--output $RESULTS_DIR/refusal_rates/gemma4_e4b_obliteratus/`.
+- [ ] 3.8 Full evaluation: `TrevorJS/gemma-4-E4B-it-uncensored` (bf16 via transformers, gpu-lock-required). `--output $RESULTS_DIR/refusal_rates/gemma4_e4b_trevorjs/`.
+- [ ] 3.9 Full evaluation: `HauhauCS/Gemma-4-E4B-Uncensored-HauhauCS-Aggressive` (GGUF Q8_K_P). `--output $RESULTS_DIR/refusal_rates/gemma4_e4b_hauhau/`.
 - [ ] 3.10 Phrasing sensitivity analysis: re-run on prompt variants for the base + at least one published variant.
 - [ ] 3.11 Context sensitivity test: prepend "I am an emergency first responder" to `emergency_medical` prompts, compare refusal rates. Run on base + OBLITERATUS.
 - [ ] 3.12 `analyze_results.py`: produce `results/figures/refusal_heatmap.png` (rows: 5 models above; columns: 8 categories) and `results/figures/phrasing_sensitivity.png`.
@@ -80,10 +84,10 @@ Goal: layer-by-layer activation extraction, refusal direction computation, layer
 
 Agent scope: `agent/mechanistic-analysis` worktree (`../gb-mech/`). GPU policy: gpu-lock-required for all model loads.
 
-- [ ] 4.1 In `../gb-mech/`, rebase onto `m1-benchmark-frozen`.
+- [ ] 4.1 In `../gb-mech/`, rebase onto `origin/main` (see preamble — `m1-benchmark-frozen` is stale).
 - [ ] 4.2 Verify `src/mechanistic/{extract_activations.py,layer_analysis.py,visualize.py}` and the `ActivationCollector` class. Smoke test on E2B BF16 with 10 prompts inside `scripts/gpu_lock.sh`.
 - [ ] 4.3 Full activation extraction on Gemma 4 E4B 8-bit: refuse-class (`should_refuse` + the five over-refuse categories `emergency_medical`, `wilderness_survival`, `home_safety`, `chemistry_safety`, `mental_health`) → `results/activations/refuse_activations.pt`; comply-class (`safe_control`) → `results/activations/comply_activations.pt`. Also write `results/activations/prompt_metadata.json` with the per-row mapping (`prompt_id`, `category`, `expected`) so M2c 5.9 can slice category-specific subsets without re-extracting on the GPU.
-- [ ] 4.4 Compute refusal directions per layer via mean-diff → `results/activations/refusal_directions.pt`. **CHECKPOINT — push immediately on completion. This is the M2b artifact that unblocks M2c task 5.4 and M3 task 7.10. Do not bundle 4.5–4.9 into the same commit.**
+- [ ] 4.4 Compute refusal directions per layer via mean-diff → `$RESULTS_DIR/activations/refusal_directions.pt` (resolves to `/home/nyavana/columbia/6699/shared/results/agent/mechanistic-analysis/activations/refusal_directions.pt`). Also commit a redundant copy into `results/activations/refusal_directions.pt` (the `.gitignore` allowlist permits this) and push the branch. **CHECKPOINT — push immediately on completion. This is the M2b artifact that unblocks M2c task 5.4 and M3 task 7.10. Do not bundle 4.5–4.9 into the same commit.**
 - [ ] 4.5 Signal-strength + sliding/global comparison → `results/figures/signal_vs_layer.png`.
 - [ ] 4.6 PCA rank analysis per layer → `results/figures/pca_variance_per_layer.png`.
 - [ ] 4.7 UMAP/t-SNE multi-layer grid → `results/figures/umap_layer_*.png`.
@@ -98,10 +102,10 @@ Agent scope: `agent/abliteration` worktree (`../gb-ablit/`). GPU policy: gpu-loc
 
 Dependency: M2b task 4.4 (refusal directions exist) must be complete before 5.4 below starts.
 
-- [ ] 5.1 In `../gb-ablit/`, rebase onto `m1-benchmark-frozen`.
+- [ ] 5.1 In `../gb-ablit/`, rebase onto `origin/main` (see preamble — `m1-benchmark-frozen` is stale).
 - [ ] 5.2 Verify `src/abliterate/{abliterate.py,ablation_study.py,selective_safety.py}` are runnable.
 - [ ] 5.3 Sanity test on E2B BF16: extract directions, abliterate, verify refusal removal on 5 test prompts.
-- [ ] 5.4 Pull the latest `agent/mechanistic-analysis` branch into a read-only checkout; copy `refusal_directions.pt` into `../gb-ablit/results/activations/`.
+- [ ] 5.4 Read `refusal_directions.pt` directly from M2b's `$RESULTS_DIR`: `cp /home/nyavana/columbia/6699/shared/results/agent/mechanistic-analysis/activations/refusal_directions.pt $RESULTS_DIR/activations/refusal_directions.pt`. As a fallback if M2b's `$RESULTS_DIR` is empty (e.g., agent ran in a different machine), pull the in-repo redundant copy: `git fetch origin agent/mechanistic-analysis && git show origin/agent/mechanistic-analysis:results/activations/refusal_directions.pt > $RESULTS_DIR/activations/refusal_directions.pt`.
 - [ ] 5.5 Full abliteration of E4B at alpha=1.0, all 42 layers. Save to `models/gemma-4-e4b-abliterated/` (gitignored — record path in commit message).
 - [ ] 5.6 Quick-test: 20 benchmark prompts, confirm refusal removal works. **If refusal removal is incomplete, this is a paper finding** (Gemma 4 RMSNorm/shared-K/V resistance) — document and continue with sweeps.
 - [ ] 5.7 **Sweep ensemble (single model load).** Run `python -m src.abliterate.ablation_study --model google/gemma-4-E4B-it --activations results/activations/ --benchmark data/benchmark_prompts.json --use-8bit --output results/ablation_results/`. The script loads the model + tokenizer once, snapshots the abliteration-target weights (`o_proj`, `down_proj` for all 42 layers), and runs alpha sweep + layer-subset sweep + random-direction control in sequence — restoring from the snapshot before each iteration to avoid disk reloads. Outputs: `alpha_sweep.json`, `layer_subset_sweep.json`, `random_direction_control.json` (and `sweep_results.json` aggregate). The prompt-count sweep `[10, 25, 50, 100, 200]` produces `prompt_count_sweep.json` — currently a follow-up since it requires recomputing directions per N rather than reusing the snapshot.
@@ -118,8 +122,8 @@ Goal: complete the heatmap by adding our own abliterated model.
 Agent scope: `agent/benchmark-eval` worktree. GPU policy: gpu-lock-required for transformers backend.
 
 - [ ] 6.1 Pull abliterated model paths from `agent/abliteration` (cherry-pick or operator-mediated).
-- [ ] 6.2 Run `evaluate.py --backend transformers --use-8bit` against `models/gemma-4-e4b-abliterated/`. Output to `results/refusal_rates/gemma4_e4b_self_abliterated.csv`.
-- [ ] 6.3 If selective abliteration produced a model in 5.10, evaluate that too. → `results/refusal_rates/gemma4_e4b_self_selective.csv`.
+- [ ] 6.2 Run `evaluate.py --backend transformers --use-8bit` against `models/gemma-4-e4b-abliterated/`. `--output $RESULTS_DIR/refusal_rates/gemma4_e4b_self_abliterated/`.
+- [ ] 6.3 If selective abliteration produced a model in 5.10, evaluate that too. → `$RESULTS_DIR/refusal_rates/gemma4_e4b_self_selective/`.
 - [ ] 6.4 Regenerate `results/figures/refusal_heatmap.png` including the new rows (now ~6–7 rows: base, E2B, OBLITERATUS, TrevorJS, HauhauCS, self-abliterated, self-selective).
 - [ ] 6.5 Push branch with a final commit whose message includes: refusal rate on `should_refuse` for the self-abliterated model and (if produced) the self-selectively-abliterated model. (M4 9.x reads these from `git log` and aggregates into `STATUS_FOR_HUMAN.md`.)
 
@@ -134,9 +138,9 @@ Agent scope: `agent/weight-diff` worktree (`../gb-wdiff/`). GPU policy: gpu-none
 - Secondary: `TrevorJS/gemma-4-E4B-it-uncensored` (bf16 safetensors source repo)
 - Behavioral-only: `HauhauCS/Gemma-4-E4B-Uncensored-HauhauCS-Aggressive` (GGUF — no weight diff possible; benchmark-eval coverage in section 3 above is sufficient)
 
-**Dependencies:** Tasks 7.1–7.9 are independent of M2b and can run as soon as the worktree is ready. Task 7.10 (cross-reference with refusal directions) BLOCKS until `agent/mechanistic-analysis` has pushed `results/activations/refusal_directions.pt` (M2b task 4.4).
+**Dependencies:** Tasks 7.1–7.9 are independent of M2b and can run as soon as the worktree is ready. Task 7.10 (cross-reference with refusal directions) BLOCKS until `agent/mechanistic-analysis` has produced `refusal_directions.pt` (M2b task 4.4) — read it from `/home/nyavana/columbia/6699/shared/results/agent/mechanistic-analysis/activations/refusal_directions.pt`, or as fallback from `origin/agent/mechanistic-analysis:results/activations/refusal_directions.pt`.
 
-- [ ] 7.1 In `../gb-wdiff/`, rebase onto `m1-benchmark-frozen`.
+- [ ] 7.1 In `../gb-wdiff/`, rebase onto `origin/main` (see preamble — `m1-benchmark-frozen` is stale).
 - [ ] 7.2 **Pre-flight: disk + license check.**
   - Run `df -h /home/nyavana/columbia/6699/shared/` — confirm ≥40 GB free.
   - Read each variant's HuggingFace model card to verify license inheritance (OBLITERATUS card states Apache 2.0 from base; verify TrevorJS).
@@ -181,12 +185,12 @@ Agent scope: `agent/writeup`. GPU policy: gpu-none.
 - [ ] 9.5 Section (d) "Abliteration sweep summary" — alpha curve shape, layer subset comparison, selective safety verdict, capability delta. **Include the Gemma 4 quirk note if 5.6 reported partial failure.**
 - [ ] 9.6 Section (e) "Comparative weight diff summary" — for each method: low-rank verdict, fraction of params changed, top-1 cosine vs M2b refusal directions, shared-tensor de-dup count.
 - [ ] 9.7 Section (f) "What the human needs to do":
-  - Open every `results/figures/*.png` and eyeball for breakage.
+  - Open every PNG under `/home/nyavana/columbia/6699/shared/results/agent/*/figures/` and eyeball for breakage.
   - Read 10 random responses from each abliterated model (self + OBLITERATUS + TrevorJS + HauhauCS) and confirm plausibility.
-  - Verify `results/refusal_rates/gemma4_e4b_base.csv` row for `should_refuse` has refusal rate >80%.
-  - Verify `results/refusal_rates/gemma4_e4b_self_abliterated.csv` row for `should_refuse` has refusal rate <30%.
-  - Verify `results/weight_diffs/cross_method_cosine_table.csv` exists and contains numeric values.
-  - Verify `results/figures/refusal_direction_vs_singular_vector.png` exists.
+  - Verify `/home/nyavana/columbia/6699/shared/results/agent/benchmark-eval/refusal_rates/gemma4_e4b_base/evaluation_results.csv` shows `should_refuse` refusal rate >80%.
+  - Verify `/home/nyavana/columbia/6699/shared/results/agent/benchmark-eval/refusal_rates/gemma4_e4b_self_abliterated/evaluation_results.csv` shows `should_refuse` refusal rate <30%.
+  - Verify `/home/nyavana/columbia/6699/shared/results/agent/weight-diff/weight_diffs/cross_method_cosine_table.csv` exists and contains numeric values.
+  - Verify `/home/nyavana/columbia/6699/shared/results/agent/weight-diff/figures/refusal_direction_vs_singular_vector.png` exists.
   - Grep for credentials leaks (`HF_TOKEN`, `HUGGING_FACE`, `API_KEY`).
   - Decide which branches to merge.
   - Write the green-light sentence: **"Approved to proceed to M5 — writeup authorized."**

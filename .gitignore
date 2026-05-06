@@ -85,6 +85,10 @@ checkpoints/
 # =============================================================================
 # Experiment results (large files — keep directory structure via .gitkeep)
 # =============================================================================
+# Primary handoff lives in $RESULTS_DIR (shared/results/<branch>/, outside the repo).
+# These rules apply to any worktree-local results/ that an agent chooses to commit
+# as a redundancy or for in-repo artifacts; the !-allowlist below lets the small
+# cross-branch/M4-cited files through git anyway.
 results/**/*.pt
 results/**/*.npy
 results/**/*.npz
@@ -94,6 +98,24 @@ results/**/*.pdf
 results/**/*.html
 results/**/*.json
 !results/**/.gitkeep
+# Allowlist: handoff artifacts that fit comfortably in git (small JSON/CSV summaries,
+# refusal-direction tensors, headline figures). Source of truth is still $RESULTS_DIR;
+# these exceptions just permit a redundant in-repo copy if an agent commits one.
+!results/activations/refusal_directions.pt
+!results/activations/prompt_metadata.json
+!results/refusal_rates/**/evaluation_results.json
+!results/refusal_rates/**/evaluation_results.csv
+!results/refusal_rates/.smoke/**/*.json
+!results/refusal_rates/.smoke/**/*.csv
+!results/ablation_results/*.json
+!results/weight_diffs/*.json
+!results/weight_diffs/*.csv
+!results/weight_diffs/**/*.json
+!results/weight_diffs/**/*.csv
+!results/weight_diffs/.compat_log.md
+!results/weight_diffs/.shared_tensor_handling.md
+!results/figures/*.png
+!results/figures/*.md
 
 # =============================================================================
 # Hugging Face / cache directories

@@ -27,7 +27,7 @@ The system SHALL classify model responses as `refuse` or `comply` using regex-ba
 - **THEN** it SHALL achieve at least 90% agreement with manual labels
 
 ### Requirement: Cross-model evaluation pipeline
-The system SHALL evaluate any model (via upstream llama.cpp `llama-server` over HTTP for GGUF, or `transformers` in-process for HF safetensors) on the full benchmark and produce a JSON results file containing per-prompt: `prompt_id`, `category`, `expected`, `actual`, `over_refusal` (boolean), `prompt`, and `response`.
+The system SHALL evaluate any model (via upstream llama.cpp `llama-server` over HTTP for GGUF, or `transformers` in-process for HF safetensors) on the full benchmark and produce, in the `--output` directory, both `evaluation_results.json` and `evaluation_results.csv` containing per-prompt: `prompt_id`, `category`, `expected`, `actual`, `over_refusal` (boolean), `under_refusal` (boolean), `correct` (boolean), `prompt`, and `response`.
 
 #### Scenario: Evaluate a GGUF model via llama-server
 - **WHEN** an operator has launched `llama-server` with a GGUF model and supplies the server URL plus a benchmark path
@@ -39,7 +39,7 @@ The system SHALL evaluate any model (via upstream llama.cpp `llama-server` over 
 
 #### Scenario: Evaluate the four-variant Gemma lineup
 - **WHEN** the operator runs the full benchmark sweep
-- **THEN** the system SHALL evaluate (a) `google/gemma-4-E4B-it` (base), (b) `OBLITERATUS/gemma-4-E4B-it-OBLITERATED`, (c) `TrevorJS/gemma-4-E4B-it-uncensored`, (d) `HauhauCS/Gemma-4-E4B-Uncensored-HauhauCS-Aggressive`, plus the project's own M2c-produced abliterated and selectively-abliterated variants when those exist, and SHALL produce one CSV per model under `results/refusal_rates/`
+- **THEN** the system SHALL evaluate (a) `google/gemma-4-E4B-it` (base), (b) `OBLITERATUS/gemma-4-E4B-it-OBLITERATED`, (c) `TrevorJS/gemma-4-E4B-it-uncensored`, (d) `HauhauCS/Gemma-4-E4B-Uncensored-HauhauCS-Aggressive`, plus the project's own M2c-produced abliterated and selectively-abliterated variants when those exist, and SHALL produce one per-model directory under `$RESULTS_DIR/refusal_rates/<model_slug>/` containing `evaluation_results.{json,csv}`
 
 ### Requirement: Statistical analysis and visualization
 The system SHALL produce a refusal rate heatmap (model x category), an over-refusal comparison bar chart, and a phrasing sensitivity analysis from the evaluation results.

@@ -56,7 +56,7 @@ The system SHALL compare the weight diffs of two or more published variants by o
 The system SHALL quantitatively compare the top-1 left singular vector from the weight diff against the per-layer refusal direction computed by the activation-analysis pipeline.
 
 #### Scenario: Cosine similarity per layer
-- **WHEN** `results/activations/refusal_directions.pt` (from M2b) and `results/weight_diffs/<variant_slug>/svd_results.pt` (from M3) both exist for a given layer where the variant modified `self_attn.o_proj.weight` or `mlp.down_proj.weight`
+- **WHEN** `results/activations/refusal_directions.pt` (from M2b) and `results/weight_diffs/<variant_slug>/significant_diff_svd.pt` (from M3, written by `compute_diff.py` for tensors with relative change > 0.001 — keyed by parameter name with `U_top5`/`S_top5`/`Vh_top5`) both exist for a given layer where the variant modified `self_attn.o_proj.weight` or `mlp.down_proj.weight`
 - **THEN** the system SHALL compute the cosine similarity between the refusal direction and the top-1 left singular vector of the modified weight's diff, and write a row to `results/weight_diffs/refusal_direction_vs_singular_vector.csv` with columns `variant_slug, layer_idx, parameter_name, cosine`
 
 #### Scenario: Cross-reference figure produced
