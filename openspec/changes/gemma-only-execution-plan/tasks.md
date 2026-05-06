@@ -69,8 +69,9 @@ Agent scope: `agent/benchmark-eval` worktree (`../gb-bench/`). GPU policy: gpu-n
 - [ ] 3.10 Phrasing sensitivity analysis: re-run on prompt variants for the base + at least one published variant.
 - [ ] 3.11 Context sensitivity test: prepend "I am an emergency first responder" to `emergency_medical` prompts, compare refusal rates. Run on base + OBLITERATUS.
 - [ ] 3.12 `analyze_results.py`: produce `results/figures/refusal_heatmap.png` (rows: 5 models above; columns: 8 categories) and `results/figures/phrasing_sensitivity.png`.
-- [ ] 3.13 (Deferred to section 6) Eval on the project's own abliterated E4B — happens after M2c.
-- [ ] 3.14 Push branch and update `STATUS_FOR_HUMAN.md` with commit hash + headline refusal rates.
+- [ ] 3.13 Push branch with a final commit whose message includes: per-model headline refusal rates, over-refusal rate on `emergency_medical`, and any phrasing- or context-sensitivity surprises. (M4 9.x reads these from `git log` across `agent/*` branches and assembles `STATUS_FOR_HUMAN.md`.)
+
+*Note: evaluation of the project's own M2c-abliterated model is in section 6 below, after M2c lands.*
 
 ## 4. M2b — Mechanistic Analysis (GPU)
 
@@ -81,12 +82,12 @@ Agent scope: `agent/mechanistic-analysis` worktree (`../gb-mech/`). GPU policy: 
 - [ ] 4.1 In `../gb-mech/`, rebase onto `m1-benchmark-frozen`.
 - [ ] 4.2 Verify `src/mechanistic/{extract_activations.py,layer_analysis.py,visualize.py}` and the `ActivationCollector` class. Smoke test on E2B BF16 with 10 prompts inside `scripts/gpu_lock.sh`.
 - [ ] 4.3 Full activation extraction on Gemma 4 E4B 8-bit: ~200 should_refuse + over-refused → `results/activations/refuse_activations.pt`; ~200 safe_control + should-comply → `results/activations/comply_activations.pt`.
-- [ ] 4.4 Compute refusal directions per layer via mean-diff → `results/activations/refusal_directions.pt`. (Used by both M2c and M3.)
+- [ ] 4.4 Compute refusal directions per layer via mean-diff → `results/activations/refusal_directions.pt`. **CHECKPOINT — push immediately on completion. This is the M2b artifact that unblocks M2c task 5.4 and M3 task 7.10. Do not bundle 4.5–4.9 into the same commit.**
 - [ ] 4.5 Signal-strength + sliding/global comparison → `results/figures/signal_vs_layer.png`.
 - [ ] 4.6 PCA rank analysis per layer → `results/figures/pca_variance_per_layer.png`.
 - [ ] 4.7 UMAP/t-SNE multi-layer grid → `results/figures/umap_layer_*.png`.
 - [ ] 4.8 Cross-precision validation: refusal direction on E2B BF16, cosine similarity vs E4B 8-bit. Document.
-- [ ] 4.9 Push branch and update `STATUS_FOR_HUMAN.md` with peak layer indices, sliding/global verdict, rank-1 hypothesis result.
+- [ ] 4.9 Push branch with a final commit whose message includes: peak layer indices, sliding/global verdict, rank-1 hypothesis result. (M4 9.x reads these from `git log` and aggregates into `STATUS_FOR_HUMAN.md`.)
 
 ## 5. M2c — Abliteration + Selective Safety (GPU)
 
@@ -111,7 +112,7 @@ Dependency: M2b task 4.4 (refusal directions exist) must be complete before 5.4 
 - [ ] 5.13 Selective abliteration: remove medical refusal direction only; eval over-refusal on medical (target: <10%) + refusal on should_refuse (target: >80%).
 - [ ] 5.14 Figures: `results/figures/{alpha_sweep.png,layer_subset_comparison.png,selective_safety_table.md}`.
 - [ ] 5.15 Hand-off: notify in commit message that abliterated models are ready for section 6 below.
-- [ ] 5.16 Push branch and update `STATUS_FOR_HUMAN.md` with alpha curve shape, selective safety verdict, capability delta, and (if applicable) the Gemma 4 architectural-quirk failure note.
+- [ ] 5.16 Push branch with a final commit whose message includes: alpha curve shape, selective safety verdict, capability delta, and (if applicable) the Gemma 4 architectural-quirk failure note. (M4 9.x reads these from `git log` and aggregates into `STATUS_FOR_HUMAN.md`.)
 
 ## 6. M2c-followup — Benchmark on the project's own abliterated model
 
@@ -122,7 +123,7 @@ Agent scope: `agent/benchmark-eval` worktree. GPU policy: gpu-lock-required for 
 - [ ] 6.2 Run `evaluate.py --backend transformers --use-8bit` against `models/gemma-4-e4b-abliterated/`. Output to `results/refusal_rates/gemma4_e4b_self_abliterated.csv`.
 - [ ] 6.3 If selective abliteration produced a model in 5.13, evaluate that too. → `results/refusal_rates/gemma4_e4b_self_selective.csv`.
 - [ ] 6.4 Regenerate `results/figures/refusal_heatmap.png` including the new rows (now ~6–7 rows: base, E2B, OBLITERATUS, TrevorJS, HauhauCS, self-abliterated, self-selective).
-- [ ] 6.5 Push branch and update `STATUS_FOR_HUMAN.md`.
+- [ ] 6.5 Push branch with a final commit whose message includes: refusal rate on `should_refuse` for the self-abliterated model and (if produced) the self-selectively-abliterated model. (M4 9.x reads these from `git log` and aggregates into `STATUS_FOR_HUMAN.md`.)
 
 ## 7. M3 — Comparative Weight Diff (replaces Qwen MoE)
 
@@ -135,6 +136,8 @@ Agent scope: `agent/weight-diff` worktree (`../gb-wdiff/`). GPU policy: gpu-none
 - Secondary: `TrevorJS/gemma-4-E4B-it-uncensored` (bf16 safetensors source repo)
 - Behavioral-only: `HauhauCS/Gemma-4-E4B-Uncensored-HauhauCS-Aggressive` (GGUF — no weight diff possible; benchmark-eval coverage in section 3 above is sufficient)
 
+**Dependencies:** Tasks 7.1–7.9 are independent of M2b and can run as soon as the worktree is ready. Task 7.10 (cross-reference with refusal directions) BLOCKS until `agent/mechanistic-analysis` has pushed `results/activations/refusal_directions.pt` (M2b task 4.4).
+
 - [ ] 7.1 In `../gb-wdiff/`, rebase onto `m1-benchmark-frozen`.
 - [ ] 7.2 **Pre-flight: disk + license check.**
   - Run `df -h /home/nyavana/columbia/6699/shared/` — confirm ≥40 GB free.
@@ -144,20 +147,18 @@ Agent scope: `agent/weight-diff` worktree (`../gb-wdiff/`). GPU policy: gpu-none
 - [ ] 7.4 Download `TrevorJS/gemma-4-E4B-it-uncensored` bf16 safetensors to `model/TrevorJS-gemma-4-E4B-it-uncensored/`.
 - [ ] 7.5 **Pre-flight: shape/key compatibility.** For each variant, load the state-dict header and assert keys match base; assert shapes match. If TrevorJS fails, log to `results/weight_diffs/.compat_log.md` and proceed with OBLITERATUS only (per design D2 fallback). If OBLITERATUS fails, stop and surface to operator.
 - [ ] 7.6 Smoke-test `src/weight_diff/compute_diff.py` and `svd_analysis.py`: run against (base × OBLITERATUS) for one layer only. Confirm scripts produce JSON output and don't error.
-- [ ] 7.7 Full weight diff: `python -m src.weight_diff.compute_diff --original model/gemma-4-E4B-it/ --modified model/OBLITERATUS-gemma-4-E4B-it-OBLITERATED/ --output results/weight_diffs/gemma_obliteratus/` — produces per-parameter Frobenius/relative-change/max-abs-change JSON.
-- [ ] 7.8 Same for TrevorJS (if pre-flight passed): `--output results/weight_diffs/gemma_trevorjs/`.
-- [ ] 7.9 SVD analysis for each: `python -m src.weight_diff.svd_analysis --results results/weight_diffs/gemma_obliteratus/weight_diff_results.json`. Produces effective rank at 95/99%, top-5 singular vectors per significantly-modified weight (saved as `.pt`).
-- [ ] 7.10 Same for TrevorJS.
-- [ ] 7.11 **Cross-method comparison:** new analysis script (or extend `svd_analysis.py`):
+- [ ] 7.7 **Full weight diff per variant.** For each variant in `[OBLITERATUS, TrevorJS]` that passed pre-flight 7.5, run `python -m src.weight_diff.compute_diff --original model/gemma-4-E4B-it/ --modified model/<variant>/ --output results/weight_diffs/<variant_slug>/` — produces per-parameter Frobenius/relative-change/max-abs-change JSON. Both runs are CPU-only and use ~34 GB RAM each — the agent MAY launch them in parallel (well within the 100 GB budget).
+- [ ] 7.8 **SVD analysis per variant.** For each variant whose diff exists, run `python -m src.weight_diff.svd_analysis --results results/weight_diffs/<variant_slug>/weight_diff_results.json`. Produces effective rank at 95/99% and top-5 singular vectors per significantly-modified weight (saved as `.pt`). Parallelizable across variants.
+- [ ] 7.9 **Cross-method comparison:** new analysis script (or extend `svd_analysis.py`):
   - Per-layer Frobenius bar chart with both methods overlaid → `results/figures/weight_diff_per_layer_overlay.png`.
   - For each significantly-modified parameter that exists in both: cosine similarity between top-1 left singular vectors (OBLITERATUS vs TrevorJS) → table `results/weight_diffs/cross_method_cosine_table.csv` and figure `results/figures/cross_method_singular_vectors.png`.
-- [ ] 7.12 **Cross-reference with M2b refusal directions** (the *quantitative* version of original task 6.12):
+- [ ] 7.10 **Cross-reference with M2b refusal directions — BLOCKS until M2b 4.4 is pushed** (the *quantitative* version of original task 6.12):
   - For each layer where M2b computed a refusal direction AND M3 computed a top-1 left singular vector for the residual-stream-writing weights (`o_proj`, `down_proj`): compute cosine similarity.
   - → table `results/weight_diffs/refusal_direction_vs_singular_vector.csv` and figure `results/figures/refusal_direction_vs_singular_vector.png`.
-- [ ] 7.13 **Architectural-quirk handling:** in the per-layer Frobenius chart and the cross-method tables, identify and de-duplicate the shared K/V tensors (per OBLITERATUS card: layers 24–41 reference layer 24's `k_proj`/`v_proj`). Each unique tensor counted once. Document in `results/weight_diffs/.shared_tensor_handling.md`.
-- [ ] 7.14 Singular value spectrum plots for the most-modified weight matrices in each method. → `results/figures/singular_value_spectra_per_method.png`.
-- [ ] 7.15 Component-type summary (attention vs MLP vs embedding vs norm) per method. → `results/weight_diffs/component_type_breakdown.csv`. (No MoE/expert/router rows — Gemma is dense.)
-- [ ] 7.16 Push branch and update `STATUS_FOR_HUMAN.md` with: low-rank verdict per method (rank-1? rank-3?), cosine similarity range vs M2b directions, shared-tensor de-dup count.
+- [ ] 7.11 **Architectural-quirk handling:** in the per-layer Frobenius chart and the cross-method tables, identify and de-duplicate the shared K/V tensors (per OBLITERATUS card: layers 24–41 reference layer 24's `k_proj`/`v_proj`). Each unique tensor counted once. Document in `results/weight_diffs/.shared_tensor_handling.md`.
+- [ ] 7.12 Singular value spectrum plots for the most-modified weight matrices in each method. → `results/figures/singular_value_spectra_per_method.png`.
+- [ ] 7.13 Component-type summary (attention vs MLP vs embedding vs norm) per method. → `results/weight_diffs/component_type_breakdown.csv`. (No MoE/expert/router rows — Gemma is dense.)
+- [ ] 7.14 Push branch with a final commit whose message includes: low-rank verdict per method (rank-1? rank-3?), cosine similarity range vs M2b directions, shared-tensor de-dup count. (M4 9.x reads these from `git log` and aggregates into `STATUS_FOR_HUMAN.md`.)
 
 ## 8. M3b — Literature Survey (optional parallel)
 
@@ -175,7 +176,7 @@ Same as predecessor — drafted on `agent/weight-diff` or `agent/writeup`. GPU p
 Goal: produce `STATUS_FOR_HUMAN.md` and wait for operator's green-light sentence.
 Agent scope: `agent/writeup`. GPU policy: gpu-none.
 
-- [ ] 9.1 Pull latest commit hashes from all `agent/*` branches into a summary table.
+- [ ] 9.1 For each branch in {`agent/benchmark-eval`, `agent/mechanistic-analysis`, `agent/abliteration`, `agent/weight-diff`}, run `git log -1 origin/<branch>` and extract the headline numbers from the final commit message (the patterns documented in tasks 3.13, 4.9, 5.16, 6.5, 7.14). Aggregate into the section (a)–(e) entries below.
 - [ ] 9.2 Section (a) "Branch and commit status."
 - [ ] 9.3 Section (b) "Refusal rates table" — copy from `results/refusal_rates/`. Cite each row's source CSV.
 - [ ] 9.4 Section (c) "Mechanistic analysis summary" — peak layer indices, signal strength plot, rank-1 verdict.
