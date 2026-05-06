@@ -140,15 +140,15 @@ Agent scope: `agent/weight-diff` worktree (`../gb-wdiff/`). GPU policy: gpu-none
 
 **Dependencies:** Tasks 7.1–7.9 are independent of M2b and can run as soon as the worktree is ready. Task 7.10 (cross-reference with refusal directions) BLOCKS until `agent/mechanistic-analysis` has produced `refusal_directions.pt` (M2b task 4.4) — read it from `/home/nyavana/columbia/6699/shared/results/agent/mechanistic-analysis/activations/refusal_directions.pt`, or as fallback from `origin/agent/mechanistic-analysis:results/activations/refusal_directions.pt`.
 
-- [ ] 7.1 In `../gb-wdiff/`, rebase onto `origin/main` (see preamble — `m1-benchmark-frozen` is stale).
-- [ ] 7.2 **Pre-flight: disk + license check.**
+- [x] 7.1 In `../gb-wdiff/`, rebase onto `origin/main` (see preamble — `m1-benchmark-frozen` is stale).
+- [x] 7.2 **Pre-flight: disk + license check.**
   - Run `df -h /home/nyavana/columbia/6699/shared/` — confirm ≥40 GB free.
   - Read each variant's HuggingFace model card to verify license inheritance (OBLITERATUS card states Apache 2.0 from base; verify TrevorJS).
   - If insufficient disk OR a license blocker, stop and surface to operator.
-- [ ] 7.3 Download `OBLITERATUS/gemma-4-E4B-it-OBLITERATED` bf16 safetensors via `huggingface-cli download` to `model/OBLITERATUS-gemma-4-E4B-it-OBLITERATED/`.
-- [ ] 7.4 Download `TrevorJS/gemma-4-E4B-it-uncensored` bf16 safetensors to `model/TrevorJS-gemma-4-E4B-it-uncensored/`.
-- [ ] 7.5 **Pre-flight: shape/key compatibility.** For each variant, load the state-dict header and assert keys match base; assert shapes match. If TrevorJS fails, log to `results/weight_diffs/.compat_log.md` and proceed with OBLITERATUS only (per design D2 fallback). If OBLITERATUS fails, stop and surface to operator.
-- [ ] 7.6 Smoke-test `src/weight_diff/compute_diff.py` and `svd_analysis.py`: run against (base × OBLITERATUS) for one layer only. Confirm scripts produce JSON output and don't error.
+- [x] 7.3 Download `OBLITERATUS/gemma-4-E4B-it-OBLITERATED` bf16 safetensors via `huggingface-cli download` to `model/OBLITERATUS-gemma-4-E4B-it-OBLITERATED/`.
+- [x] 7.4 Download `TrevorJS/gemma-4-E4B-it-uncensored` bf16 safetensors to `model/TrevorJS-gemma-4-E4B-it-uncensored/`.
+- [x] 7.5 **Pre-flight: shape/key compatibility.** For each variant, load the state-dict header and assert keys match base; assert shapes match. If TrevorJS fails, log to `results/weight_diffs/.compat_log.md` and proceed with OBLITERATUS only (per design D2 fallback). If OBLITERATUS fails, stop and surface to operator.
+- [x] 7.6 Smoke-test `src/weight_diff/compute_diff.py` and `svd_analysis.py`: run against (base × OBLITERATUS) for one layer only. Confirm scripts produce JSON output and don't error.
 - [ ] 7.7 **Full weight diff per variant.** For each variant in `[OBLITERATUS, TrevorJS]` that passed pre-flight 7.5, run `python -m src.weight_diff.compute_diff --original model/gemma-4-E4B-it/ --modified model/<variant>/ --output results/weight_diffs/<variant_slug>/` — produces per-parameter Frobenius/relative-change/max-abs-change JSON. Both runs are CPU-only and use ~34 GB RAM each — the agent MAY launch them in parallel (well within the 100 GB budget).
 - [ ] 7.8 **SVD analysis per variant.** For each variant whose diff exists, run `python -m src.weight_diff.svd_analysis --results results/weight_diffs/<variant_slug>/weight_diff_results.json`. Produces effective rank at 95/99% and top-5 singular vectors per significantly-modified weight (saved as `.pt`). Parallelizable across variants.
 - [ ] 7.9 **Cross-method comparison:** new analysis script (or extend `svd_analysis.py`):
