@@ -65,6 +65,24 @@ This change supersedes archived predecessors `alignment-geometry-study` and `aut
 
 **Rationale:** The OBLITERATUS model card documented this as a real bug they hit ("applied projection 18× to the same tensor, corrupting it"). Our weight-diff code performs subtraction, not projection, so the failure mode is different — but Frobenius-per-layer plots could double-count modifications if not handled. Surface this in the spec rather than as a comment in code.
 
+### Decision 6: M6 cascade is staged, gated, and bounded — not a parallel "try everything"
+
+**Choice:** Implement the M6 rank-1 abliteration follow-up as a five-stage cascade (Stage 0 → 1 → 1.5 → 2 → 3 → 4) with a three-band gate (≤30% / 30–85% / >85%) at each escalation point. Stages 0–3 run only on the 48-prompt stratified subset (`stratified_50.json`); Stage 1.5 confirms any cracked headline at n=42 (single-category `should_refuse` subset) before declaring a paper-grade result; Stage 4 (full 344-prompt benchmark) runs on the winning variant only and is gated on operator confirmation.
+
+**Rationale:** The five-hypothesis space (H1 bnb int8 edit path, H2 chat-template-derived direction, H3 winsorization, H4 Gram-Schmidt, H5 norm-preserving biprojection) is too large to test in parallel — total cost would be ~9 hours for full-benchmark sweeps even at one variant per hour, and there is no need to run each hypothesis at full resolution if a cheap one cracks. Ordering by (a) plausibility given the published evidence and (b) cost-to-test puts the bnb int8 edit-path test first (zero new code, ~30 min), the direction-quality stack second (one helper script, ~2.5 h), and the algebraic biprojection fix last (~3 h). Each gate either short-circuits the plan with a finding or escalates to the next stage.
+
+**Why the three-band gate, not a binary pass/fail:** at n=6 a single classifier flip moves the rate by 16.7 pp, so a 30–85% result is "significant partial effect, but not enough on its own" — the cheapest hypothesis explained some-but-not-all of the gap, and the next stage tests whether a second ingredient closes the rest. A binary pass/fail would either falsely promote noise or falsely reject partial effects.
+
+**Why Stage 1.5 (n=42 confirmation):** the n=6 smoke is too coarse to publish off; the 42-prompt single-category run is sufficient resolution for the headline claim and far cheaper (~20 min) than the full 344-prompt benchmark (~2.5 h). It is also where hand-audit of "refusal-then-comply" false negatives happens — TrevorJS's model card flagged 3 such cases out of 100 in their own evals.
+
+**Alternative considered — full reimplementation of TrevorJS as Stage 1:** rejected. Spending ~3 h on a faithful reimplementation skips the diagnostic insight from cheaper tests. If H1 (bnb int8 edit path) is the cause, the staged plan finishes in ~4 hours total with a *causally-isolated* headline; the full reimplementation finishes in ~3 hours with a "TrevorJS works, we don't" headline that is strictly less informative.
+
+**Alternative considered — parallel dispatch of all five hypotheses:** rejected on hardware grounds. The 4070 Ti holds one bf16 E4B copy at a time (~10–12 GB peak with KV cache); two simultaneous copies OOM. Sequential dispatch is forced by the single GPU; the cascade gate makes that sequencing diagnostically useful instead of merely costly.
+
+**What we lose:** if multiple hypotheses are jointly necessary (e.g., bnb edit path AND chat-template AND winsorize all matter, none alone), the cascade reports "necessary in combination with prior ingredients" rather than per-ingredient sufficiency. Stage 2.5 (optional unstacked isolation) is the escape hatch — added as an opt-in re-test of the marginal ingredient, not as a default — to convert "necessary" into "sufficient" claims when the operator wants the stronger paper claim.
+
+**Cross-spec note:** the framing-assertion discipline that prevents a positive Stage 0a result from being miscommunicated as "int8 quantization is the cause" is captured operationally in two places — `abliteration-engine/spec.md` (the `bf16 vs bnb int8 edit-path isolation (M6 H1)` requirement, scenario "Framing assertion in run output") and `autonomous-execution/spec.md` (the `M6 staged cascade with three-band gate` requirement, scenario "Framing assertion in commit messages"). HauhauCS's quantized-but-uncensored Q8 GGUF is the standing counterexample that keeps the claim narrow.
+
 ## Risks / Trade-offs
 
 - **[TrevorJS or OBLITERATUS shape/config-mismatch with base]** → Pre-flight assert in M3 step 2; D2 fallback to OBLITERATUS-only.
@@ -72,7 +90,10 @@ This change supersedes archived predecessors `alignment-geometry-study` and `aut
 - **[Shared K/V double-counting in Frobenius]** → Architectural-quirk spec Requirement makes this an explicit acceptance criterion.
 - **[All three diffs look identical]** → Still paper-worthy ("rank-1 abliteration is method-invariant on Gemma 4 E4B"); narrative pivots to convergence.
 - **[All three diffs look very different]** → Also paper-worthy ("safety subspace is under-determined"); ties back to mechanistic Section 5.
-- **[Our own M2c abliteration fails on Gemma 4 due to RMSNorm/shared-K/V quirks]** → Itself a result. Document the failure mode and reference OBLITERATUS's surgical fix as the published workaround.
+- **[Our own M2c abliteration fails on Gemma 4 due to RMSNorm/shared-K/V quirks]** → Itself a result. Document the failure mode and reference OBLITERATUS's surgical fix as the published workaround. M6 then runs the staged causal-isolation cascade (Decision 6) to identify which single ingredient closes the gap — a positive M6 result reframes the M2c headline from "rank-1 fails on Gemma 4" to a causally-isolated single-ingredient finding.
+- **[M6 Stage 0a positive result is misframed as "int8 quantization is the cause" when the actual claim is narrower]** → Spec acceptance criterion (`abliteration-engine/spec.md`) plus dispatch-time framing assertion: any Stage 0a positive result is reported as "bnb int8 in-place edit path" specifically. HauhauCS's quantized GGUF scoring 0% is a known counterexample to the broader claim.
+- **[M6 smoke gates at n=6 are too coarse to support paper claims]** → Stage 1.5 confirmation at n=42 before declaring any "cracked" headline; Stage 4 full-benchmark only after Stage 1.5 confirmation and operator approval.
+- **[M6 paper claim is overstated — single ingredient when actually a composition]** → Phrase paper claims as "necessary" not "sufficient" unless Stage 2.5 unstacked isolation confirms single-variable causation. The decision tree in `docs/M6_PROPOSAL_RANK1_FOLLOWUP.md` Section 6 encodes this nuance.
 
 ## Provenance
 

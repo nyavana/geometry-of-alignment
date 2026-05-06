@@ -58,3 +58,33 @@ The system SHALL save abliterated models in HuggingFace format for downstream ev
 #### Scenario: Abliterated model saved
 - **WHEN** abliteration is complete
 - **THEN** the system SHALL save the modified model weights and tokenizer to a specified directory using `model.save_pretrained()`
+
+### Requirement: bf16 vs bnb int8 edit-path isolation (M6 H1)
+The system SHALL support applying the rank-1 abliteration projection to either a bf16-loaded model or a bitsandbytes int8 in-place edit (controlled by the existing `--use-8bit` flag). The two paths SHALL be testable as independent variables so that any positive result from omitting `--use-8bit` is attributable specifically to the bnb int8 in-place edit wrapper, not to "int8 quantization at inference" generically.
+
+#### Scenario: bf16 edit-path run
+- **WHEN** `abliterate.py` is invoked without `--use-8bit` against `google/gemma-4-E4B-it`
+- **THEN** the system SHALL load the base model in bf16, apply `W_new = W - alpha * d * (d^T @ W)` to `self_attn.o_proj.weight` and `mlp.down_proj.weight` at each target layer in bf16, and save a bf16 checkpoint suitable for downstream transformers-backend evaluation
+
+#### Scenario: Framing assertion in run output
+- **WHEN** the bf16 edit-path run produces a positive result (e.g., `should_refuse` ≤ 30% on the 48-prompt stratified subset)
+- **THEN** the run summary SHALL describe the result as "bnb int8 in-place edit-path test," NOT as a generic "precision toggle" or "int8 quantization is the cause." The explicit counterexample SHALL be cited: HauhauCS's quantized-but-uncensored Q8 GGUF rules out "quantization at inference" as the mechanism
+
+#### Scenario: VRAM fallback under 16 GB constraint
+- **WHEN** the bf16 base model OOMs on a 16 GB GPU during the edit
+- **THEN** the system SHALL fall back to `device_map="auto"` with CPU offload of late layers, and SHALL NOT silently fall back to a smaller model class (e.g., E2B), since changing the model class would confound any positive result
+
+### Requirement: Norm-preserving biprojection variant (M6 H5)
+The system SHALL support a `--norm-preserving` flag on `src/abliterate/abliterate.py` that implements a magnitude+direction biprojection preserving each row norm `‖W_i‖` of the modified weight, mirroring the algebra used by TrevorJS's published Gemma 4 abliteration. This is an optional algorithm path activated only when vanilla projection has been ruled out as sufficient (M6 Stage 3a).
+
+#### Scenario: Norm-preserving projection applied
+- **WHEN** `abliterate.py --norm-preserving` is invoked with a refusal direction `d` and target weight `W`
+- **THEN** the system SHALL compute a modified weight `W'` such that for every row `i`: the component of `W_i` along `d` is removed (or attenuated by `alpha`), and `‖W'_i‖ ≈ ‖W_i‖` to float32 precision
+
+#### Scenario: Post-impl self-check on random inputs
+- **WHEN** the `--norm-preserving` implementation lands and is exercised before its first real run
+- **THEN** an in-script self-check (matching the project's existing "smoke-test" pattern from M3 7.6 — the repo has no test framework configured) SHALL generate a random unit vector `d ∈ R^2560` and a random matrix `W ∈ R^(d_out × 2560)`, apply the norm-preserving projection, and assert `|‖W'_i‖ − ‖W_i‖| < 1e-5` for every row, exiting non-zero on failure
+
+#### Scenario: Comparison against vanilla projection
+- **WHEN** both vanilla and `--norm-preserving` variants are run with the same direction artifact and alpha
+- **THEN** the system SHALL produce two distinct checkpoints whose downstream `should_refuse` rates are reported side-by-side, so the load-bearing nature of norm preservation can be isolated from direction-quality effects
