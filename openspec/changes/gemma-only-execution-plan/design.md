@@ -1,12 +1,10 @@
 ## Context
 
-The project entered M2 with two openspec changes already in flight: `alignment-geometry-study` (the science) and `autonomous-agent-pivot` (the execution model). M0 and M1 are complete (`m1-benchmark-frozen` tag on `main`). Two facts changed the plan at the M2 boundary:
+The project's research goal is to locate where refusal/safety behavior lives in the weights of Gemma 4 E4B-it and characterize whether and how it can be selectively perturbed. M0 (environment bootstrap) and M1 (benchmark freeze, 340 prompts + 640 variants) are complete; the `m1-benchmark-frozen` tag on `main` marks the boundary. M2–M5 are the live workstreams: benchmark evaluation, mechanistic analysis, abliteration + selective safety, comparative weight diff, human verification gate, and paper writeup.
 
-1. **Qwen3.5-35B-A3B is a poor fit for this hardware.** The 35B-A3B doesn't fit on the 16 GB GPU, so the original plan put it on CPU with the 100 GB RAM. CPU iteration over a ~70 GB MoE checkpoint is slow enough that completing M3 was a credible risk. The MoE-expert analysis question is novel but sits orthogonally to the rest of the project, which is end-to-end Gemma 4 E4B.
+The science context that justifies the comparative weight-diff phase: standard Arditi-style abliteration is documented (2025–2026 literature) to fail cleanly on Gemma 4 due to (a) four RMSNorm layers per decoder block (instead of the two found in earlier transformer designs) and (b) shared K/V tensors across layers 24–41. Multiple published Gemma 4 E4B uncensored variants — OBLITERATUS, TrevorJS, HauhauCS — each handle these quirks differently. Comparing their weight diffs on the same parameter space yields a quantitative cross-method comparison and lets the project's own M2b refusal directions be cosine-checked against the published variants' singular vectors.
 
-2. **Multiple published Gemma 4 E4B abliterations now exist** (OBLITERATUS, TrevorJS, HauhauCS, and Heretic-derived variants). Recent (2025–2026) literature documents that standard Arditi-style abliteration fails cleanly on Gemma 4 due to (a) four RMSNorm layers per decoder block and (b) shared K/V tensors across layers 24–41. The published variants each solved this differently. Comparing their weight diffs produces a quantitative same-parameter-space comparison.
-
-This change folds both observations into one consolidation.
+This change supersedes archived predecessors `alignment-geometry-study` and `autonomous-agent-pivot` (see `openspec/archive/`).
 
 ## Goals / Non-Goals
 
@@ -75,18 +73,10 @@ This change folds both observations into one consolidation.
 - **[All three diffs look identical]** → Still paper-worthy ("rank-1 abliteration is method-invariant on Gemma 4 E4B"); narrative pivots to convergence.
 - **[All three diffs look very different]** → Also paper-worthy ("safety subspace is under-determined"); ties back to mechanistic Section 5.
 - **[Our own M2c abliteration fails on Gemma 4 due to RMSNorm/shared-K/V quirks]** → Itself a result. Document the failure mode and reference OBLITERATUS's surgical fix as the published workaround.
-- **[Up-front consolidation cost]** → Front-loaded once instead of paying it twice.
 
-## Migration Plan
+## Provenance
 
-1. Create new openspec change directory + skeleton (Task 1 of this plan).
-2. Write proposal, design, six spec files, tasks.md (Tasks 2–10).
-3. Validate with `openspec validate gemma-only-execution-plan` (Task 11).
-4. Move predecessors to `openspec/archive/`, add `_NOTE.md` redirects (Tasks 12–13).
-5. Update `CLAUDE.md`, `README.md`, `docs/project_plan.md`, `docs/project_proposal.md` (Tasks 14–17).
-6. Delete `src/weight_diff/moe_expert_analysis.py` (Task 18).
-7. Final verification — `openspec list` shows only the new change; grep for stale Qwen references (Task 19).
-8. Single squashed commit per task, all on `main` as a doc-level bootstrap exception (matches M0/M1 precedent).
+This change consolidates two predecessor openspec changes — `alignment-geometry-study` (the science framing) and `autonomous-agent-pivot` (the autonomous-agent execution model) — both archived under `openspec/archive/<name>/` with `_NOTE.md` redirects pointing here. M0 (environment bootstrap) and M1 (benchmark freeze) were completed under those predecessors and are referenced from `tasks.md` for traceability; their work is not re-executed.
 
 ## Open Questions
 

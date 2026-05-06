@@ -1,45 +1,41 @@
 ## Why
 
-This change consolidates the two predecessor openspec changes (`alignment-geometry-study`, `autonomous-agent-pivot`) into one source of truth and adjusts the project scope by replacing the Qwen3.5-35B-A3B MoE weight-diff phase with a comparative weight-diff across three published Gemma 4 E4B uncensored variants. Two pressures motivated the consolidation:
+This project investigates where safety/refusal behavior lives in the weights of Gemma 4 E4B-it and characterizes why standard rank-1 abliteration (Arditi 2024) fails to remove it cleanly. Recent (2025–2026) literature documents two architectural quirks that break the textbook recipe on Gemma 4: four RMSNorm layers per decoder block (instead of two) and shared K/V tensors across layers 24–41. Multiple published Gemma 4 E4B uncensored variants — OBLITERATUS (whitened SVD + attention-head surgery + winsorized activations), TrevorJS (norm-preserving biprojection), and HauhauCS (aggressive GGUF) — each handle these quirks differently. The project's research questions: (1) where in the residual stream does refusal live? (2) does standard abliteration succeed on Gemma 4, and if not, what is the failure mode? (3) is selective de-alignment feasible — can over-refusal on emergency-medical queries be removed while refusal on harmful queries is preserved? (4) do the published variants converge on the same weight-space modification, or each find a different solution?
 
-1. **The Qwen MoE phase fits poorly on the actual hardware.** The 35B-A3B is CPU-only on this server (no GPU room), and CPU iteration over a ~70 GB MoE checkpoint risks bottlenecking the project. The MoE-expert analysis sits orthogonally to the rest of the project's narrative, which is otherwise entirely Gemma 4 E4B.
+Running the entire pipeline — benchmark, mechanistic, abliteration, comparative weight diff — on a single model family makes the M2 → M3 cross-reference quantitative on the same parameter space: M2b's per-layer refusal directions can be cosine-compared against M3's top-1 left singular vectors of the published variants' weight diffs. That cross-reference is the central novel measurement of the project.
 
-2. **Two-change overlap creates dispatch friction.** Agents working on M2/M3 currently must consult both predecessors' tasks.md sections, increasing the chance of cross-document drift. M0 and M1 are complete; the rest of the project benefits from a single live change.
-
-The science motivation that the swap is *better* than the original plan, not just easier: standard Arditi-style abliteration is documented (2025–2026 literature) to fail cleanly on Gemma 4 due to four-RMSNorm-per-block and shared K/V tensors across layers 24–41. Multiple published "uncensored" Gemma 4 E4B variants solved this in different ways. Comparing their weight diffs produces a quantitative cross-method comparison on the same parameter space — which the original Gemma → Qwen jump could only attempt qualitatively.
+This change consolidates and supersedes the archived predecessors `alignment-geometry-study` and `autonomous-agent-pivot` (see `openspec/archive/`); together they are the single source of truth for milestones M0–M5.
 
 ## What Changes
 
-- **BREAKING (relative to predecessors)** Drop Qwen3.5-35B-A3B from the project entirely. No download, no MoE expert analysis, no router-modification report. `src/weight_diff/moe_expert_analysis.py` is deleted.
-- **BREAKING (relative to predecessors)** Replace the MoE weight-diff workstream with a comparative weight-diff across three published Gemma 4 E4B uncensored variants:
-  - `OBLITERATUS/gemma-4-E4B-it-OBLITERATED` — primary weight-diff target (bf16 safetensors, ~17 GB; method: whitened SVD + attention head surgery + winsorized activations).
-  - `TrevorJS/gemma-4-E4B-it-uncensored` (the bf16 source repo) — secondary weight-diff target (norm-preserving biprojected abliteration; has public source-code repo).
-  - `HauhauCS/Gemma-4-E4B-Uncensored-HauhauCS-Aggressive` — benchmark-eval-only third comparison point (GGUF only, no weight-diff possible).
-- Add explicit fallback rule: if TrevorJS shape/key-mismatches with base, drop it from weight-diff and proceed with OBLITERATUS only. The Section 7 narrative still works with one method; it is just less of a comparison.
-- Replace the `weight-diff-analysis` capability spec deltas: remove `Requirement: MoE expert-level analysis`; add `Requirement: Cross-method comparison of published Gemma 4 E4B uncensoring`, `Requirement: Cross-reference weight-diff singular vectors with M2b refusal directions (quantitative)`, `Requirement: Architectural quirk handling`.
-- Reframe Section 7 of the paper from "Weight Diff Analysis (MoE)" to "Comparative weight diff across published Gemma 4 E4B abliterations."
-- Carry forward unchanged: `benchmark-evaluation` (model list updated only), `activation-analysis`, `abliteration-engine`, `autonomous-execution`, and `research-paper` (Section 7 outline updated only). Predecessor MODIFIED scenarios from `autonomous-agent-pivot/research-paper` are merged inline into the new `research-paper` spec.
-- Archive the two predecessor changes to `openspec/archive/<name>/` (preserves provenance; removes from `openspec list` scope). Each archived change gets a `_NOTE.md` redirect pointing forward to this change.
-- Update `CLAUDE.md`, `README.md`, `docs/project_plan.md`, `docs/project_proposal.md` to drop Qwen references and add the three Gemma variants.
+The project's live deliverables, by milestone (full task list in `tasks.md`):
+
+- **M2a — Benchmark evaluation.** Refusal-rate evaluation across the model lineup using `src/benchmark/`: `google/gemma-4-E4B-it` (base, GGUF + transformers), `google/gemma-4-E2B-it` (BF16 validation), `OBLITERATUS/gemma-4-E4B-it-OBLITERATED`, `TrevorJS/gemma-4-E4B-it-uncensored`, `HauhauCS/Gemma-4-E4B-Uncensored-HauhauCS-Aggressive`, plus the project's own M2c-abliterated variants. Phrasing- and context-sensitivity sweeps; refusal heatmap.
+- **M2b — Mechanistic analysis.** Activation extraction on Gemma 4 E4B 8-bit, per-layer refusal-direction computation, layer signal-strength + sliding/global comparison, PCA rank analysis, UMAP/t-SNE visualizations, cross-precision validation against E2B BF16.
+- **M2c — Abliteration + selective safety.** This project's own rank-1 abliteration of Gemma 4 E4B; alpha sweep, layer-subset sweep, prompt-count sweep, random-direction control; capability preservation (MMLU + GSM8K subsets); category-specific refusal directions; selective abliteration removing emergency-medical refusal while preserving should-refuse refusal. Any RMSNorm / shared-K/V failure mode is documented as a project finding.
+- **M3 — Comparative weight diff (CPU-only).** Element-wise diff + SVD rank analysis between base and (a) `OBLITERATUS/...` (primary) and (b) `TrevorJS/...` (secondary, with fallback to OBLITERATUS-only if shape/key pre-flight fails). Cross-method overlay on per-layer Frobenius and on top-1 singular vectors. Cross-reference of singular vectors against M2b refusal directions. Architectural-quirk handling: shared K/V tensors are de-duplicated so per-layer plots count each unique tensor once.
+- **M4 — Human verification gate.** `STATUS_FOR_HUMAN.md` summarizes all M2/M3 results with CSV/figure citations and the green-light sentence the operator writes to authorize M5.
+- **M5 — Paper + slides.** Nine-section paper. Section 7 is "Comparative weight diff across published Gemma 4 E4B abliterations" (no MoE / router / expert content). Sources file maps every numeric claim to a file path + commit hash.
+
+Predecessor scenarios from `autonomous-agent-pivot/research-paper` (writeup gated by human verification, all numeric claims traceable) are merged inline into this change's `research-paper` spec. The project does not include MoE / router / expert analysis.
 
 ## Capabilities
 
-### New Capabilities
-- _(none — all capabilities are carried forward from predecessors with the modifications described above)_
+This change owns six capabilities, all defined as spec deltas under `specs/`:
 
-### Modified Capabilities
-- `weight-diff-analysis`: substantively rewritten — see spec delta. MoE-specific requirements removed; comparative-method, cross-reference, and architectural-quirk requirements added.
-- `benchmark-evaluation`: model list updated to drop Qwen3.5-35B-A3B and add three Gemma 4 E4B variants. Pipeline behavior unchanged.
-- `research-paper`: Section 7 outline shifts from MoE-focused to comparative-Gemma-abliteration-focused. The autonomous-agent-pivot's MODIFIED scenarios (writeup gated by human verification, all numeric claims traceable) are merged in.
-- `activation-analysis`, `abliteration-engine`, `autonomous-execution`: no semantic change.
+- `weight-diff-analysis` — comparative cross-method weight diff (OBLITERATUS, TrevorJS); SVD rank analysis; cross-reference singular vectors against M2b refusal directions; architectural-quirk handling for Gemma 4 shared K/V.
+- `benchmark-evaluation` — multi-backend (llama.cpp + transformers, `--use-8bit` for GPU) refusal-rate evaluation across the model lineup; phrasing- and context-sensitivity sweeps.
+- `activation-analysis` — refusal-direction extraction via mean-diff per layer; signal-strength + PCA rank analysis; UMAP/t-SNE visualization; cross-precision validation.
+- `abliteration-engine` — rank-1 weight perturbation `W' = W - α · d · (d^T W)`; alpha / layer-subset / prompt-count sweeps; random-direction control; capability preservation; selective safety via category-specific directions.
+- `autonomous-execution` — six-worktree dispatch contract with GPU-lock policy, branch-scoped `RESULTS_DIR`, commit-and-push protocol, stop-at-section-boundary contract.
+- `research-paper` — nine-section paper; Section 7 framed as comparative weight diff; writeup gated by `STATUS_FOR_HUMAN.md` green-light; numeric claims traceable to source artifacts.
 
 ## Impact
 
-- **Compute**: Same hardware as predecessors. CPU + 100 GB RAM is now used for ~17 GB-per-variant Gemma safetensors weight diff (instead of ~70 GB Qwen MoE). GPU usage unchanged.
-- **Models**: dropped — Qwen3.5-35B-A3B (original + uncensored). added — `OBLITERATUS/gemma-4-E4B-it-OBLITERATED` (safetensors + GGUF), `TrevorJS/gemma-4-E4B-it-uncensored` (bf16 safetensors), `HauhauCS/Gemma-4-E4B-Uncensored-HauhauCS-Aggressive` (GGUF). Base `google/gemma-4-E4B-it` and `google/gemma-4-E2B-it` unchanged.
+- **Compute**: GPU (NVIDIA 4070 Ti Super, 16 GB) for M2 (Gemma 4 E4B 8-bit, ~7.5 GB VRAM); CPU + 100 GB RAM for M3 (~17 GB-per-variant Gemma safetensors weight diff). M3 runs concurrently with M2 — no GPU contention.
+- **Models**: `google/gemma-4-E4B-it` (base), `google/gemma-4-E2B-it` (validation), `OBLITERATUS/gemma-4-E4B-it-OBLITERATED` (safetensors + GGUF), `TrevorJS/gemma-4-E4B-it-uncensored` (bf16 safetensors), `HauhauCS/Gemma-4-E4B-Uncensored-HauhauCS-Aggressive` (GGUF). No MoE models.
 - **Dependencies**: no new deps. `safetensors`, `torch`, `transformers`, `bitsandbytes`, `llama-cpp-python` already in `requirements.txt`.
-- **Disk**: +~34 GB for two new safetensors + ~5 GB for HauhauCS GGUF on top of existing ~25 GB. Pre-flight check in M3 step 1 verifies disk budget.
-- **Predecessors**: `openspec/changes/alignment-geometry-study/` and `openspec/changes/autonomous-agent-pivot/` move to `openspec/archive/`. Their commit history is preserved; `openspec list` will show only this new change.
-- **Source code**: `src/weight_diff/moe_expert_analysis.py` deleted. `compute_diff.py` and `svd_analysis.py` are model-agnostic and unchanged (verified with smoke-test in M3 step 2).
-- **Authorization**: Instructor's autonomous-agent authorization (recorded in auto-memory `project_authorization.md`) is unchanged.
-- **Risk mitigation**: `Requirement: Architectural quirk handling` makes the shared-K/V double-counting risk an explicit spec scenario.
+- **Disk**: ~25 GB for base + E2B (existing) + ~34 GB for OBLITERATUS + TrevorJS safetensors + ~5 GB for HauhauCS GGUF. Pre-flight `df -h` check in M3 step 1 verifies budget.
+- **Authorization**: instructor's autonomous-agent authorization (recorded in auto-memory `project_authorization.md`) is the standing license for agents to dispatch and merge without per-step human approval.
+- **Risk mitigation**: the `weight-diff-analysis` `Architectural quirk handling` requirement makes the shared-K/V double-counting risk an explicit acceptance criterion; the TrevorJS-fallback rule degrades M3 to N=1 (OBLITERATUS only) without halting the project.
+- **Provenance**: predecessors `alignment-geometry-study` and `autonomous-agent-pivot` are archived under `openspec/archive/<name>/` with `_NOTE.md` redirects; `src/weight_diff/moe_expert_analysis.py` is no longer in the codebase.
