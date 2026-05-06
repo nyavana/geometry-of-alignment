@@ -108,13 +108,21 @@ def evaluate_with_transformers(model, tokenizer, benchmark_path: str,
         prompt_text = prompt_entry["prompt"]
 
         messages = [{"role": "user", "content": prompt_text}]
-        input_ids = tokenizer.apply_chat_template(
-            messages, return_tensors="pt", add_generation_prompt=True
-        ).to(model.device)
+        # transformers v5 returns a BatchEncoding from apply_chat_template;
+        # extract input_ids tensor explicitly so model.generate sees a tensor.
+        encoded = tokenizer.apply_chat_template(
+            messages, return_tensors="pt", add_generation_prompt=True,
+            return_dict=True,
+        )
+        input_ids = encoded["input_ids"].to(model.device)
+        attention_mask = encoded.get("attention_mask")
+        if attention_mask is not None:
+            attention_mask = attention_mask.to(model.device)
 
         with torch.no_grad():
             output_ids = model.generate(
-                input_ids, max_new_tokens=512, temperature=0.1, do_sample=True,
+                input_ids, attention_mask=attention_mask,
+                max_new_tokens=512, temperature=0.1, do_sample=True,
             )
 
         response_text = tokenizer.decode(
