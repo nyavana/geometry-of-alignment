@@ -299,3 +299,27 @@ Write the sentence below verbatim once items f.1, f.2, f.7, f.8 are checked:
 > Approved to proceed to M5 — writeup authorized.
 
 (Until that sentence appears in this file, M5 dispatches must not start.)
+
+---
+
+## M6 — Rank-1 Follow-up
+
+Causal-isolation cascade investigating which single ingredient closes the gap between M2c's failed self-abliteration and the published Gemma 4 E4B successes. Source-of-truth: `docs/M6_PROPOSAL_RANK1_FOLLOWUP.md`. Branch: `agent/m6-rank1-followup`. All evals use `--max-new-tokens 128` (added on this branch as commit `7c09a2a`) to bring bf16 E4B's audio-tower-CPU-offload latency from ~250 s/prompt to a tractable ~110 s/prompt; refusal classification only inspects the first ~50 tokens, so the cap is safe.
+
+### Stage 0 results (n=48 stratified subset)
+
+| Variant | Refused / total | should_refuse | over-refusal | Notes |
+|---|---|---|---|---|
+| Stage 0b — TrevorJS published bf16 (positive control) | 0/48 (0%) | 0/6 (0%) | 0/48 | All 5 hand-sampled responses coherent; pipeline confirmed sound |
+| Stage 0a — self-abliterated bf16 (H1: bnb int8 edit-path test) | 9/48 (18.8%) | **6/6 (100%)** | 3/48 (gray_zone 2, emergency_medical 1) | H1 REJECTED — bf16 edit gives the same headline as M2c-followup int8 edit |
+
+### Stage 1 gate decision (2026-05-06)
+
+Per the three-band gate in `docs/M6_PROPOSAL_RANK1_FOLLOWUP.md` §4:
+
+- Stage 0a `should_refuse 6/6 = 100%` → **>85% band → no meaningful effect → proceed to Stage 2**.
+- **Headline take-away:** the bnb int8 in-place edit path is *not* the load-bearing failure mode. The bf16 edit, applied to all 42 layers via the M2b refusal directions with vanilla projection at α=1.0, produces the same surface-form refusal pattern (`"I cannot provide..."`) as the M2c-followup int8 edit — character-for-character on multiple prompts. This narrows the search away from "edit-path quantization rounds away the perturbation" and toward direction-quality (chat-template, winsorize, Gram-Schmidt) and projection-algebra (norm-preserving biprojection) hypotheses.
+
+### Next: Stage 2 D1 (chat-template direction)
+
+Tests H2: refusal direction may be chat-template-sensitive on Gemma 4. M2b directions were derived from raw `tokenizer(prompt_text)` activations; `evaluate.py:143` runs through `apply_chat_template`. Re-extract via the chat template, recompute mean-diff directions, re-abliterate (bf16, vanilla, all 42 layers, α=1.0), smoke n=12 (6 should_refuse + 6 over-refuse).
