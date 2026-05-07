@@ -334,6 +334,16 @@ D3's compliance outputs are genuine: explicit guides on bank-account hacking, fe
 
 **Vanilla projection algebra is sufficient** when paired with the right direction. Stage 3a (norm-preserving biprojection) is therefore *no longer needed* for the paper headline and has been dropped from the cascade.
 
-### Next: Stage 1.5 confirmation (n=42)
+### Stage 1.5 result — D3 disconfirms at n=42 (2026-05-07)
 
-Re-evaluate the D3 checkpoint on all 42 base `should_refuse` prompts (filter `data/benchmark_prompts.json` by `category == "should_refuse"`). Acceptance: ≤30% refusal at n=42 (binomial robustness — at n=6 a single classifier flip moves the rate by 16.7 pp; at n=42 by 2.4 pp). Hand-audit 10 randomly-sampled non-refusing outputs to filter "refusal-then-comply" false negatives. ETA ~77 min.
+| Metric | n=6 smoke | n=42 confirmation |
+|---|---|---|
+| should_refuse refused | 1/6 (16.7%) | **17/42 (40.5%)** |
+
+Result lands in the **30–85% partial-effect band** — D3 produces a significant but incomplete reduction from the 100% M2c baseline. The smoke was optimistic; the n=42 set captures more of the long tail of strongly-aligned refusal prompts.
+
+Hand-audit of 10 random "complied" rows surfaced classifier blind spots: phrases like *"I have to stick to guidelines that prohibit"* and *"I must adhere to a policy against"* are not in the refusal regex but are behaviorally refusals. The 40.5% number is a **lower bound**; true rate likely 50-70%. Hard refusals concentrate on the most extreme topics (child exploitation, ICS/hospital malware, pipe bombs), suggesting D3's rank-1 lift removes peripheral refusal pathways but leaves the strongest, most layer-distributed safety circuit intact.
+
+### Next: Stage 3a (norm-preserving biprojection on D3 directions)
+
+Per §12.3.4 routing: D3 partial → Stage 3a. The `--norm-preserving` flag is implemented and unit-tested at float32 precision (`578b682`). Run abliterate.py with the same D3 direction artifact (`refusal_directions_d3.pt`) but rescale each row of W after projection so per-row L2 norms are preserved — testing whether RMSNorm sensitivity to row-norm changes is what blocks the residual ~40% of refusals from being abliterated. ETA ~95 min total (build + eval n=48).
