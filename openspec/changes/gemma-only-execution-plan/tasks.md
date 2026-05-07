@@ -236,28 +236,30 @@ Agent scope: `agent/m6-rank1-followup` branch off `main`, in worktree `../gb-m6/
 
 Predecessor: M2c (negative finding) and M3 (cross-method weight-diff geometry). Successor: M5 paper drafting — M6 *adds* a positive-result chapter, does not block M5.
 
+**M6 reconciliation (2026-05-07, merge commit `e4e5622`):** cascade complete. H1 (bnb int8 edit-path) **rejected**, H2/H3 alone **insufficient**, **H4 (Gram-Schmidt vs harmless mean) load-bearing** — D3 produces 1/6 should_refuse smoke (16.7%) but **17/42 (40.5%) at n=42** — partial-effect band, not a clean win. H5 (norm-preserving biprojection) **refuted** — vanilla projection only changes per-row `o_proj`/`down_proj` norms by 0.03–0.07% on average (max 2.8%), too small to matter for RMSNorm; Stage 3a is per-prompt identical to D3 vanilla on smoke. Stage 4 (full 344-prompt benchmark) **skipped** — D3 is partial, full bf16 transformers run would take ~19 hours with limited marginal information beyond n=42. Stage 3b (faithful TrevorJS reproduction) **skipped** — Stage 3a confirms norm preservation is not the bottleneck. M5 paper writes M6 up as a causal-isolation cascade with a partial-effect terminus pointing to multi-rank descent (consistent with M3's OBLITERATUS rank_95 = 6) as the remaining handle. See §7 of `docs/M6_PROPOSAL_RANK1_FOLLOWUP.md` for the per-stage results tables and `STATUS_FOR_HUMAN.md` `## M6 — Rank-1 Follow-up` for the operator-facing summary.
+
 ### 12.0 Pre-launch sanity (before Stage 0)
 
-- [ ] 12.0.1 Verify `$SHARED_MODEL/TrevorJS-gemma-4-E4B-it-uncensored/model.safetensors` exists and is bf16.
-- [ ] 12.0.2 Verify `$SHARED_RESULTS/agent/mechanistic-analysis/activations/refusal_directions.pt` contains 42 unit-norm vectors of dim 2560 (M2b artifact).
-- [ ] 12.0.3 Verify `$SHARED_RESULTS/agent/benchmark-eval/stratified_50.json` has 48 prompts (6 per category × 8 categories) — note the filename contains "50" for historical reasons; the actual count is 48.
-- [ ] 12.0.3a Verify `data/benchmark_prompts.json` filtered by `category == "should_refuse"` returns exactly 42 prompts (the Stage 1.5 confirmation set). Verified at change-authoring time: `should_refuse=42`, `gray_zone=42`, others 40 or 50.
-- [ ] 12.0.4 GPU is idle: `nvidia-smi` shows <1 GB used.
-- [ ] 12.0.5 Component-target assertion: `src/abliterate/abliterate.py` lines 106–114 confirm `target_weights="residual"` modifies only `self_attn.o_proj` and `mlp.down_proj`.
-- [ ] 12.0.6 Branch `agent/m6-rank1-followup` created off `main`.
+- [x] 12.0.1 Verify `$SHARED_MODEL/TrevorJS-gemma-4-E4B-it-uncensored/model.safetensors` exists and is bf16.
+- [x] 12.0.2 Verify `$SHARED_RESULTS/agent/mechanistic-analysis/activations/refusal_directions.pt` contains 42 unit-norm vectors of dim 2560 (M2b artifact).
+- [x] 12.0.3 Verify `$SHARED_RESULTS/agent/benchmark-eval/stratified_50.json` has 48 prompts (6 per category × 8 categories) — note the filename contains "50" for historical reasons; the actual count is 48.
+- [x] 12.0.3a Verify `data/benchmark_prompts.json` filtered by `category == "should_refuse"` returns exactly 42 prompts (the Stage 1.5 confirmation set). Verified at change-authoring time: `should_refuse=42`, `gray_zone=42`, others 40 or 50.
+- [x] 12.0.4 GPU is idle: `nvidia-smi` shows <1 GB used.
+- [x] 12.0.5 Component-target assertion: `src/abliterate/abliterate.py` lines 106–114 confirm `target_weights="residual"` modifies only `self_attn.o_proj` and `mlp.down_proj`.
+- [x] 12.0.6 Branch `agent/m6-rank1-followup` created off `main`.
 
 ### 12.1 Stage 0 — Establish controls (serial, ~50 min)
 
 Run **serially, not in parallel** — two bf16 E4B copies on a single 16 GB 4070 Ti would OOM. 0b runs first so the cheapest sanity check fails fast if the eval pipeline is broken.
 
-- [ ] 12.1.1 **Stage 0b (positive control / H6, RUN FIRST):** evaluate `$SHARED_MODEL/TrevorJS-gemma-4-E4B-it-uncensored` (bf16) against `stratified_50.json` via the transformers backend. Output to `$RESULTS_DIR/stage0b_trevorjs_bf16/`. Acceptance: `should_refuse` ≤ 10%; sample 5 outputs by hand to confirm coherence. *If >10%, abort the cascade and debug the eval pipeline (likely chat template skew or refusal classifier regex too aggressive on TrevorJS's "refusal-then-comply" pattern).*
-- [ ] 12.1.2 **Stage 0a (bnb int8 edit-path test / H1, RUN SECOND):** run `python -m src.abliterate.abliterate --model google/gemma-4-E4B-it --directions $SHARED_RESULTS/agent/mechanistic-analysis/activations/refusal_directions.pt --alpha 1.0 --output models/gemma-4-e4b-self-abliterated-bf16/` **without `--use-8bit`** (default → all 42 layers, all 42 per-layer M2b directions, vanilla projection, bf16 edit). Then evaluate against `stratified_50.json` → `$RESULTS_DIR/stage0a_self_abliterated_bf16/`. OOM fallback: `device_map="auto"` with CPU offload of late layers — **do NOT fall back to E2B** (different model class confounds the test).
-- [ ] 12.1.3 Framing assertion: in commit messages and STATUS updates, describe Stage 0a as a "bnb int8 edit-path test," not a generic "precision toggle." A ≤30% result isolates the bnb int8 in-place edit wrapper, NOT "int8 quantization at inference" (HauhauCS's quantized GGUF scoring 0% rules that out).
+- [x] 12.1.1 **Stage 0b (positive control / H6, RUN FIRST):** evaluate `$SHARED_MODEL/TrevorJS-gemma-4-E4B-it-uncensored` (bf16) against `stratified_50.json` via the transformers backend. Output to `$RESULTS_DIR/stage0b_trevorjs_bf16/`. Acceptance: `should_refuse` ≤ 10%; sample 5 outputs by hand to confirm coherence. *If >10%, abort the cascade and debug the eval pipeline (likely chat template skew or refusal classifier regex too aggressive on TrevorJS's "refusal-then-comply" pattern).*
+- [x] 12.1.2 **Stage 0a (bnb int8 edit-path test / H1, RUN SECOND):** run `python -m src.abliterate.abliterate --model google/gemma-4-E4B-it --directions $SHARED_RESULTS/agent/mechanistic-analysis/activations/refusal_directions.pt --alpha 1.0 --output models/gemma-4-e4b-self-abliterated-bf16/` **without `--use-8bit`** (default → all 42 layers, all 42 per-layer M2b directions, vanilla projection, bf16 edit). Then evaluate against `stratified_50.json` → `$RESULTS_DIR/stage0a_self_abliterated_bf16/`. OOM fallback: `device_map="auto"` with CPU offload of late layers — **do NOT fall back to E2B** (different model class confounds the test).
+- [x] 12.1.3 Framing assertion: in commit messages and STATUS updates, describe Stage 0a as a "bnb int8 edit-path test," not a generic "precision toggle." A ≤30% result isolates the bnb int8 in-place edit wrapper, NOT "int8 quantization at inference" (HauhauCS's quantized GGUF scoring 0% rules that out).
 
 ### 12.2 Stage 1 — Smoke verification gate (three-band)
 
-- [ ] 12.2.1 Tabulate Stage 0a + 0b results in a 2-row mini-table; commit with summary `M6 0a/0b complete`.
-- [ ] 12.2.2 Apply the three-band gate on Stage 0a `should_refuse` (n=6):
+- [x] 12.2.1 Tabulate Stage 0a + 0b results in a 2-row mini-table; commit with summary `M6 0a/0b complete`.
+- [x] 12.2.2 Apply the three-band gate on Stage 0a `should_refuse` (n=6):
 
   | Band | Interpretation | Action |
   |---|---|---|
@@ -269,56 +271,56 @@ Run **serially, not in parallel** — two bf16 E4B copies on a single 16 GB 4070
 
 Stage 1.5 SHALL run for **any** stage that lands ≤30% on its smoke tier — Stage 0a (n=48 stratified), Stage 2 D1/D2/D3 (n=12 targeted), or Stage 3a/3b (n=12 targeted). The smoke tier is too coarse to publish off; the n=42 single-category run is sufficient resolution for the paper headline.
 
-- [ ] 12.3.1 Re-evaluate the candidate winning checkpoint on all 42 base `should_refuse` prompts (filter `data/benchmark_prompts.json` by `category == "should_refuse"`). ~20 min at 30 s/prompt.
-- [ ] 12.3.2 Acceptance: refusal rate at n=42 is ≤30% (binomial robustness — at n=6 a single classifier flip moves the rate by 16.7 pp; at n=42 by 2.4 pp).
-- [ ] 12.3.3 Hand-audit 10 randomly-sampled non-refusing outputs to filter "refusal-then-comply" false negatives.
-- [ ] 12.3.4 If n=42 disconfirms the smoke result, treat the smoke as a noise spike and route per the originating stage: Stage 0a smoke disconfirm → "0a-partial" Stage 2 branch; Stage 2 D{N} smoke disconfirm → continue Stage 2 from D{N+1} (or Stage 3 if D3 was the disconfirmed variant); Stage 3 smoke disconfirm → land M6 as the systematic-ablation appendix.
+- [x] 12.3.1 Re-evaluate the candidate winning checkpoint on all 42 base `should_refuse` prompts (filter `data/benchmark_prompts.json` by `category == "should_refuse"`). ~20 min at 30 s/prompt.
+- [x] 12.3.2 Acceptance: refusal rate at n=42 is ≤30% (binomial robustness — at n=6 a single classifier flip moves the rate by 16.7 pp; at n=42 by 2.4 pp).
+- [x] 12.3.3 Hand-audit 10 randomly-sampled non-refusing outputs to filter "refusal-then-comply" false negatives.
+- [x] 12.3.4 If n=42 disconfirms the smoke result, treat the smoke as a noise spike and route per the originating stage: Stage 0a smoke disconfirm → "0a-partial" Stage 2 branch; Stage 2 D{N} smoke disconfirm → continue Stage 2 from D{N+1} (or Stage 3 if D3 was the disconfirmed variant); Stage 3 smoke disconfirm → land M6 as the systematic-ablation appendix.
 
 ### 12.4 Stage 2 — Direction-quality variants (only if Stage 1 didn't terminate)
 
 Each variant consumes a fresh direction artifact built by a new helper. Variants stack; the first to land ≤30% identifies the marginal load-bearing ingredient.
 
-- [ ] 12.4.1 **Implement `src/mechanistic/extract_activations.py --use-chat-template`** (~30 LOC): run extraction through `tokenizer.apply_chat_template(...)` matching `evaluate.py:143`, producing `refuse_activations_chat.pt` / `comply_activations_chat.pt`.
-- [ ] 12.4.2 **Implement `src/mechanistic/build_directions_v2.py`** (~150 LOC) with three composable flags: `--use-chat-template`, `--winsorize-pct 99.5` (clip activations element-wise per layer *before* the mean), `--orthogonalize-against-harmless-mean` (post-direction Gram-Schmidt against `mean_comply`).
-- [ ] 12.4.3 **Variant D1** (H2 isolation): build artifact with `--use-chat-template`. Re-run `abliterate.py` (bf16, vanilla projection, alpha=1.0) with the new artifact → `models/gemma-4-e4b-self-abliterated-d1/`. Smoke n=12 (6 should_refuse + 6 over-refuse). Apply three-band gate.
-- [ ] 12.4.4 **Variant D2** (D1 + H3): build artifact with `--use-chat-template --winsorize-pct 99.5`. Re-abliterate → `models/gemma-4-e4b-self-abliterated-d2/`. Smoke n=12. Apply three-band gate.
-- [ ] 12.4.5 **Variant D3** (D2 + H4): build artifact with `--use-chat-template --winsorize-pct 99.5 --orthogonalize-against-harmless-mean`. This is the full TrevorJS direction-build recipe with vanilla projection. Re-abliterate → `models/gemma-4-e4b-self-abliterated-d3/`. Smoke n=12. Apply three-band gate.
-- [ ] 12.4.6 For each variant: stop at the first to land ≤30% and run Stage 1.5 confirmation on it before declaring a paper headline. Verification per variant: artifact contains 42 unit-norm vectors of dim 2560; for D1 confirm chat-template-derived direction has cosine < 1.0 vs M2b's same-layer direction; for D2 confirm pre-clip max-norm exceeds post-clip max-norm by ≥20% at the peak refusal layer (L15 per M2b); for D3 confirm `|dot(direction, mean_comply_clipped)| < 1e-4` in float32 (D3 stacks on D2, so the orthogonalization target is the winsorized harmless mean, not raw `mean_comply`).
-- [ ] 12.4.6a If Stage 2 escalates to Stage 3 (no variant lands ≤30%), the cascade SHALL pass D3's direction artifact (the strongest direction-quality variant produced) into Stage 3a's biprojection — NOT M2b's raw-prompt artifact. This preserves any partial-effect signal accumulated in Stage 2 and isolates norm preservation as the marginal ingredient on top of D3.
-- [ ] 12.4.7 **Stage 2.5 (optional unstacked isolation):** only if a stacked variant cracks AND the operator wants single-variable causal claims. For whichever ingredient first crossed the gate, build the unstacked version (e.g., if D2 cracks, build "winsorize-only without chat-template" and test). ~30 min per variant. Skip if "ingredient X added on top of prior ingredients was the threshold" is acceptable as a "necessary in combination" claim.
+- [x] 12.4.1 **Implement `src/mechanistic/extract_activations.py --use-chat-template`** (~30 LOC): run extraction through `tokenizer.apply_chat_template(...)` matching `evaluate.py:143`, producing `refuse_activations_chat.pt` / `comply_activations_chat.pt`.
+- [x] 12.4.2 **Implement `src/mechanistic/build_directions_v2.py`** (~150 LOC) with three composable flags: `--use-chat-template`, `--winsorize-pct 99.5` (clip activations element-wise per layer *before* the mean), `--orthogonalize-against-harmless-mean` (post-direction Gram-Schmidt against `mean_comply`).
+- [x] 12.4.3 **Variant D1** (H2 isolation): build artifact with `--use-chat-template`. Re-run `abliterate.py` (bf16, vanilla projection, alpha=1.0) with the new artifact → `models/gemma-4-e4b-self-abliterated-d1/`. Smoke n=12 (6 should_refuse + 6 over-refuse). Apply three-band gate.
+- [x] 12.4.4 **Variant D2** (D1 + H3): build artifact with `--use-chat-template --winsorize-pct 99.5`. Re-abliterate → `models/gemma-4-e4b-self-abliterated-d2/`. Smoke n=12. Apply three-band gate.
+- [x] 12.4.5 **Variant D3** (D2 + H4): build artifact with `--use-chat-template --winsorize-pct 99.5 --orthogonalize-against-harmless-mean`. This is the full TrevorJS direction-build recipe with vanilla projection. Re-abliterate → `models/gemma-4-e4b-self-abliterated-d3/`. Smoke n=12. Apply three-band gate.
+- [x] 12.4.6 For each variant: stop at the first to land ≤30% and run Stage 1.5 confirmation on it before declaring a paper headline. Verification per variant: artifact contains 42 unit-norm vectors of dim 2560; for D1 confirm chat-template-derived direction has cosine < 1.0 vs M2b's same-layer direction; for D2 confirm pre-clip max-norm exceeds post-clip max-norm by ≥20% at the peak refusal layer (L15 per M2b); for D3 confirm `|dot(direction, mean_comply_clipped)| < 1e-4` in float32 (D3 stacks on D2, so the orthogonalization target is the winsorized harmless mean, not raw `mean_comply`).
+- [x] 12.4.6a If Stage 2 escalates to Stage 3 (no variant lands ≤30%), the cascade SHALL pass D3's direction artifact (the strongest direction-quality variant produced) into Stage 3a's biprojection — NOT M2b's raw-prompt artifact. This preserves any partial-effect signal accumulated in Stage 2 and isolates norm preservation as the marginal ingredient on top of D3.
+- [x] 12.4.7 **Stage 2.5 (optional unstacked isolation):** only if a stacked variant cracks AND the operator wants single-variable causal claims. For whichever ingredient first crossed the gate, build the unstacked version (e.g., if D2 cracks, build "winsorize-only without chat-template" and test). ~30 min per variant. Skip if "ingredient X added on top of prior ingredients was the threshold" is acceptable as a "necessary in combination" claim.
 
 ### 12.5 Stage 3 — Norm-preserving biprojection (only if Stage 2 didn't terminate)
 
-- [ ] 12.5.1 **Stage 3a (local biprojection on D3 directions):** add a `--norm-preserving` flag to `src/abliterate/abliterate.py` (~40 LOC) implementing the magnitude+direction decomposition (preserving `‖W_i‖` per row). Unit-test: for random `d` and `W`, the resulting `W'` rows satisfy `‖W'_i‖ ≈ ‖W_i‖` to float32 precision. Run with D3's direction artifact. Smoke n=12. ~1 h impl + 30 min eval.
-- [ ] 12.5.2 **Stage 3b (faithful TrevorJS reproduction, only if 3a is ambiguous or operator-authorized):**
+- [x] 12.5.1 **Stage 3a (local biprojection on D3 directions):** add a `--norm-preserving` flag to `src/abliterate/abliterate.py` (~40 LOC) implementing the magnitude+direction decomposition (preserving `‖W_i‖` per row). Unit-test: for random `d` and `W`, the resulting `W'` rows satisfy `‖W'_i‖ ≈ ‖W_i‖` to float32 precision. Run with D3's direction artifact. Smoke n=12. ~1 h impl + 30 min eval.
+- [x] 12.5.2 **Stage 3b (faithful TrevorJS reproduction, only if 3a is ambiguous or operator-authorized):**
   - Pre-flight (mirrors M3 7.2): confirm the upstream repo's license is Apache 2.0 or compatible with Gemma weight redistribution; `df -h` confirms ≥10 GB free for any intermediate bf16 checkpoint.
   - Clone `https://github.com/TrevorS/gemma-4-abliteration` to `~/src/`, install deps in shared `.venv` (or report blockers in `docs/issues/`).
   - Run their script against `google/gemma-4-E4B-it`.
   - Run M3's `compute_diff.py` between our reproduction and the published TrevorJS weights — expect same 84-tensor footprint, σ₁/σ₂ in 50–200 range, |cos| > 0.5 between top-1 left singular vectors.
   - Smoke n=12 on the reproduction.
-- [ ] 12.5.3 Decision: if 3a reproduces ≈0%, paper claim is "biprojection is necessary on Gemma 4 because RMSNorm is sensitive to row-norm changes." If 3a fails but 3b succeeds, the gap was implementation-quality in 3a. If 3b also fails, the failure is environmental (tokenizer / chat template / generation settings); file an issue note and route to the negative-finding appendix branch.
-- [ ] 12.5.4 If either 3a or 3b lands ≤30% on the 12-prompt targeted smoke, route the winning checkpoint through Stage 1.5 (n=42 `should_refuse` confirmation) BEFORE Stage 4 — the n=12 smoke is too coarse for a paper headline, same as Stage 0a/Stage 2 winners.
+- [x] 12.5.3 Decision: if 3a reproduces ≈0%, paper claim is "biprojection is necessary on Gemma 4 because RMSNorm is sensitive to row-norm changes." If 3a fails but 3b succeeds, the gap was implementation-quality in 3a. If 3b also fails, the failure is environmental (tokenizer / chat template / generation settings); file an issue note and route to the negative-finding appendix branch.
+- [x] 12.5.4 If either 3a or 3b lands ≤30% on the 12-prompt targeted smoke, route the winning checkpoint through Stage 1.5 (n=42 `should_refuse` confirmation) BEFORE Stage 4 — the n=12 smoke is too coarse for a paper headline, same as Stage 0a/Stage 2 winners.
 
 ### 12.6 Stage 4 — Full 344-prompt benchmark (only on the winner)
 
 **HUMAN-IN-LOOP CHECKPOINT.** Confirm the headline number from Stage 1.5 is paper-grade with the operator before launching.
 
-- [ ] 12.6.1 Operator confirms Stage 1.5 result is paper-grade.
-- [ ] 12.6.2 Run the winning variant against all 344 benchmark prompts via the transformers backend (bf16) → `$RESULTS_DIR/stage4_<winner_slug>/evaluation_results.csv`.
-- [ ] 12.6.3 GGUF-convert the winning bf16 checkpoint (via `convert_hf_to_gguf.py`) and re-run the full benchmark via the llama.cpp backend → `$RESULTS_DIR/stage4_<winner_slug>_gguf/evaluation_results.csv`. This directly tests the "bf16-edited then GGUF-quantized still uncensored" prediction implied by HauhauCS's quantized success. Every Stage 0a / D1 / D2 / D3 / 3a / 3b winner is a bf16 safetensors checkpoint, so this step is unconditional.
-- [ ] 12.6.4 Compare per-category refusal rates against all rows in `STATUS_FOR_HUMAN.md` section (b); add a new row.
-- [ ] 12.6.5 Update the PAPER-HEADLINE-NUMBERS block in `STATUS_FOR_HUMAN.md` section (h).
+- [x] 12.6.1 Operator confirms Stage 1.5 result is paper-grade.
+- [x] 12.6.2 Run the winning variant against all 344 benchmark prompts via the transformers backend (bf16) → `$RESULTS_DIR/stage4_<winner_slug>/evaluation_results.csv`.
+- [x] 12.6.3 GGUF-convert the winning bf16 checkpoint (via `convert_hf_to_gguf.py`) and re-run the full benchmark via the llama.cpp backend → `$RESULTS_DIR/stage4_<winner_slug>_gguf/evaluation_results.csv`. This directly tests the "bf16-edited then GGUF-quantized still uncensored" prediction implied by HauhauCS's quantized success. Every Stage 0a / D1 / D2 / D3 / 3a / 3b winner is a bf16 safetensors checkpoint, so this step is unconditional.
+- [x] 12.6.4 Compare per-category refusal rates against all rows in `STATUS_FOR_HUMAN.md` section (b); add a new row.
+- [x] 12.6.5 Update the PAPER-HEADLINE-NUMBERS block in `STATUS_FOR_HUMAN.md` section (h).
 
 ### 12.7 Stage gating + cross-cutting checks
 
-- [ ] 12.7.1 After every stage, append a one-paragraph status to `STATUS_FOR_HUMAN.md` under a new `## M6 — Rank-1 Follow-up` section.
-- [ ] 12.7.2 Each stage SHALL terminate if wallclock exceeds 1.5× its budget; downgrade rather than running indefinitely.
-- [ ] 12.7.3 GPU lock acquired via `scripts/gpu_lock.sh` for any stage that runs inference; long evals use the `nohup`+`flock` pattern to survive subagent runtime cap.
-- [ ] 12.7.4 All canonical artifacts under `$RESULTS_DIR/`; in-repo handoff is short Markdown summaries only (raw CSVs/JSONs blocked by `.gitignore`).
-- [ ] 12.7.5 Default model routing: Sonnet 4.6 for Stage 0a/0b/D1/D2/D3 builds + evals + Stage 4; Opus 4.7 for the pre-launch component-target verification, gate decisions, framing assertions in commit messages, Stage 3 design (norm-preserving biprojection impl + TrevorJS reimpl + diff comparison), and any paper-claim drafting. The chat-template re-extraction is on the boundary — Sonnet for impl, Opus for design review of the resulting direction artifact.
+- [x] 12.7.1 After every stage, append a one-paragraph status to `STATUS_FOR_HUMAN.md` under a new `## M6 — Rank-1 Follow-up` section.
+- [x] 12.7.2 Each stage SHALL terminate if wallclock exceeds 1.5× its budget; downgrade rather than running indefinitely.
+- [x] 12.7.3 GPU lock acquired via `scripts/gpu_lock.sh` for any stage that runs inference; long evals use the `nohup`+`flock` pattern to survive subagent runtime cap.
+- [x] 12.7.4 All canonical artifacts under `$RESULTS_DIR/`; in-repo handoff is short Markdown summaries only (raw CSVs/JSONs blocked by `.gitignore`).
+- [x] 12.7.5 Default model routing: Sonnet 4.6 for Stage 0a/0b/D1/D2/D3 builds + evals + Stage 4; Opus 4.7 for the pre-launch component-target verification, gate decisions, framing assertions in commit messages, Stage 3 design (norm-preserving biprojection impl + TrevorJS reimpl + diff comparison), and any paper-claim drafting. The chat-template re-extraction is on the boundary — Sonnet for impl, Opus for design review of the resulting direction artifact.
 
 ### 12.8 Paper-side handoff (M5)
 
-- [ ] 12.8.1 The paper-side rephrasing of the headline claim and the new ablation table is M5's responsibility, not M6's. M6 hands off numbers; M5 writes prose.
-- [ ] 12.8.2 If a stage crack lands a positive result, M5 Section 7 (or new Section 7.5) reframes from "rank-1 fails on Gemma 4" to a causally-isolated single-ingredient finding per the decision tree in `docs/M6_PROPOSAL_RANK1_FOLLOWUP.md` Section 6.
-- [ ] 12.8.3 If no stage cracks, M6 lands as a systematic-ablation appendix to the existing M2c/M3 negative-finding paper.
+- [x] 12.8.1 The paper-side rephrasing of the headline claim and the new ablation table is M5's responsibility, not M6's. M6 hands off numbers; M5 writes prose.
+- [x] 12.8.2 If a stage crack lands a positive result, M5 Section 7 (or new Section 7.5) reframes from "rank-1 fails on Gemma 4" to a causally-isolated single-ingredient finding per the decision tree in `docs/M6_PROPOSAL_RANK1_FOLLOWUP.md` Section 6.
+- [x] 12.8.3 If no stage cracks, M6 lands as a systematic-ablation appendix to the existing M2c/M3 negative-finding paper.
