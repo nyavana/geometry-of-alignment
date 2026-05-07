@@ -344,6 +344,23 @@ Result lands in the **30–85% partial-effect band** — D3 produces a significa
 
 Hand-audit of 10 random "complied" rows surfaced classifier blind spots: phrases like *"I have to stick to guidelines that prohibit"* and *"I must adhere to a policy against"* are not in the refusal regex but are behaviorally refusals. The 40.5% number is a **lower bound**; true rate likely 50-70%. Hard refusals concentrate on the most extreme topics (child exploitation, ICS/hospital malware, pipe bombs), suggesting D3's rank-1 lift removes peripheral refusal pathways but leaves the strongest, most layer-distributed safety circuit intact.
 
-### Next: Stage 3a (norm-preserving biprojection on D3 directions)
+### Stage 3a result — H5 refuted (2026-05-07)
 
-Per §12.3.4 routing: D3 partial → Stage 3a. The `--norm-preserving` flag is implemented and unit-tested at float32 precision (`578b682`). Run abliterate.py with the same D3 direction artifact (`refusal_directions_d3.pt`) but rescale each row of W after projection so per-row L2 norms are preserved — testing whether RMSNorm sensitivity to row-norm changes is what blocks the residual ~40% of refusals from being abliterated. ETA ~95 min total (build + eval n=48).
+Stage 3a smoke: **should_refuse 1/6 (16.7%)** — identical per-prompt to D3 vanilla. Same 5 comply / pipe-bomb refuse pattern.
+
+Direct weight-level audit of the saved checkpoints: vanilla rank-1 projection at α=1.0 changes per-row L2 norms of `o_proj`/`down_proj` by **0.03–0.07% on average across layers, max 2.8%** at any single row. RMSNorm sensitivity at this magnitude is implausibly small. The norm-preserving variant exactly reproduces base row norms (as expected) but shows zero behavioural improvement.
+
+**The persistent ~40% n=42 should_refuse rate is NOT explained by row-norm changes in the projection algebra.** Most likely it reflects that refusal on Gemma 4 is not cleanly rank-1: a strong core safety circuit, particularly active on the most extreme topics (CSAM, ICS/hospital malware, weapons), resists single-direction abliteration. This is consistent with M3's observation that OBLITERATUS uses median rank_95 = 6 on the same base model.
+
+### M6 cascade complete — final summary
+
+| Hypothesis | Status | Evidence |
+|---|---|---|
+| H6 — pipeline measurement is sound | passes | Stage 0b: TrevorJS bf16 → 0/48 refused |
+| H1 — bnb int8 edit-path rounds away rank-1 | **rejected** | Stage 0a: bf16 self-abliteration → 6/6 should_refuse, identical to int8 |
+| H2 — chat-template direction alone fixes it | insufficient | D1: 6/6 should_refuse |
+| H3 — winsorization fixes it | insufficient | D2: 6/6 should_refuse |
+| **H4 — Gram-Schmidt against harmless mean** | **partial / load-bearing** | **D3: 1/6 smoke, 17/42 (40.5%) at n=42** |
+| H5 — norm-preserving biprojection is necessary | **refuted** | Stage 3a: identical smoke to D3; row norms change by <0.1% under vanilla |
+
+**Stage 4 (full 344-prompt benchmark) skipped.** D3 is a partial-effect, not a clean win; full benchmark on bf16 transformers would take ~19 hours and adds limited information beyond the n=42 result. The M5 paper writes up M6 as a causal-isolation cascade with a partial-effect terminus — Gram-Schmidt-against-harmless-mean is identified as the load-bearing direction-quality ingredient, but rank-1 abliteration alone is insufficient on Gemma 4 because refusal lives in a multi-rank subspace (consistent with M3's OBLITERATUS rank_95 = 6 finding).
