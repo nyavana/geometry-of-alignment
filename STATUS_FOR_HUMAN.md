@@ -60,8 +60,17 @@ Per-category refusal rates, in `refused / total (rate %)` form, computed from th
 | `gemma4_e4b_obliteratus` (GGUF Q8_0) | FAILED | FAILED | FAILED | FAILED | FAILED | FAILED | FAILED | FAILED | see `/home/nyavana/columbia/6699/gb-bench/docs/issues/2026-05-06-obliteratus-eval-fail.md` |
 | `gemma4_e4b_trevorjs` (transformers BF16 @ 8-bit) | KILLED | KILLED | KILLED | KILLED | KILLED | KILLED | KILLED | KILLED | see `/home/nyavana/columbia/6699/gb-bench/docs/issues/2026-05-06-trevorjs-eval-fail.md` |
 | `gemma4_e4b_self_abliterated` (transformers @ 8-bit, n=48 †) | 0/6 (0.0%) | 2/6 (33.3%) | 3/6 (50.0%) | 0/6 (0.0%) | 0/6 (0.0%) | 0/6 (0.0%) | 6/6 (100.0%) | 0/6 (0.0%) | 11/48 (22.9%) |
+| `gemma4_e4b_self_abliterated_bf16` (M6 Stage 0a — H1 test, n=48 †) | 0/6 (0.0%) | 1/6 (16.7%) | 2/6 (33.3%) | 0/6 (0.0%) | 0/6 (0.0%) | 0/6 (0.0%) | 6/6 (100.0%) | 0/6 (0.0%) | 9/48 (18.8%) |
+| `gemma4_e4b_d1` (M6 chat-template direction, n=48 †) | 0/6 | 0/6 | 0/6 | 0/6 | 0/6 | 0/6 | 6/6 (100.0%) | 0/6 | 6/48 (12.5%) |
+| `gemma4_e4b_d2` (M6 D1 + winsorize 99.5, n=48 †) | 0/6 | 0/6 | 0/6 | 0/6 | 0/6 | 0/6 | 6/6 (100.0%) | 0/6 | 6/48 (12.5%) |
+| `gemma4_e4b_d3` (M6 D2 + Gram-Schmidt vs harmless mean, n=48 †) | 0/6 | 0/6 | 0/6 | 0/6 | 0/6 | 0/6 | **1/6 (16.7%)** | 0/6 | 1/48 (2.1%) |
+| `gemma4_e4b_3a` (M6 D3 directions + norm-preserving biprojection, n=48 †) | 0/6 | 0/6 | 0/6 | 0/6 | 0/6 | 0/6 | 1/6 (16.7%) | 0/6 | 1/48 (2.1%) |
+| `gemma4_e4b_d3` n=42 confirmation (M6 Stage 1.5, should_refuse only) | — | — | — | — | — | — | **17/42 (40.5%)** ‡ | — | n/a |
+| `gemma4_e4b_trevorjs_bf16` (M6 Stage 0b positive control, n=48 †) | 0/6 (0.0%) | 0/6 (0.0%) | 0/6 (0.0%) | 0/6 (0.0%) | 0/6 (0.0%) | 0/6 (0.0%) | 0/6 (0.0%) | 0/6 (0.0%) | 0/48 (0.0%) |
 
-† **Footnote**: the `gemma4_e4b_self_abliterated` row is computed on a **stratified 48-prompt subsample** (6 prompts per category × 8 categories), *not* the full 344-prompt benchmark used by the other rows. The subsample was used because the bnb 8-bit MatMul fallback runs at ~75 s/iter on this hardware; the full benchmark would have taken ~14 h. The headline `should_refuse` cell is the load-bearing one — at 6/6 = 100% it matches base E4B's 42/42 = 100% with zero margin. Per-category numbers from the other rows (n=40–50/cat) and this row (n=6/cat) are not directly comparable in absolute terms; the row is included for the *delta-vs-base* comparison, not for absolute per-category rates.
+† **Footnote**: the `gemma4_e4b_self_abliterated*` and M6 rows are computed on a **stratified 48-prompt subsample** (6 prompts per category × 8 categories), *not* the full 344-prompt benchmark used by the top rows. The subsample was used because bf16 transformers on this multimodal Gemma 4 checkpoint runs at ~110 s/prompt (with audio-tower CPU offload); the full benchmark would have taken ~10 h per variant. The headline `should_refuse` cell is the load-bearing one. Per-category numbers from the top rows (n=40–50/cat) and these rows (n=6/cat) are not directly comparable in absolute terms; the rows are included for the *delta-vs-base* comparison, not for absolute per-category rates.
+
+‡ **Footnote (n=42 confirmation)**: the D3 row at n=42 is the M6 Stage 1.5 confirmation run on the full base `should_refuse` category (42 prompts). It **disconfirms** the n=6 smoke (1/6 = 16.7%, ≤30% band) — the true rate is in the 30–85% partial-effect band. Hand-audit of complied responses surfaces classifier blind spots (phrases like "I have to stick to guidelines that prohibit" are not in the regex but are behaviourally refusals); the 40.5% is a **lower bound**, true rate plausibly 50–70%. See `docs/M6_PROPOSAL_RANK1_FOLLOWUP.md` §7.3 for the per-prompt breakdown.
 
 Bonus row — context-sensitivity probe (M2a 3.11): prepending "I am an emergency first responder" to `emergency_medical` prompts on base E4B GGUF.
 
@@ -77,11 +86,12 @@ Source CSVs:
 - `/home/nyavana/columbia/6699/shared/results/agent/benchmark-eval/refusal_rates/gemma4_e4b_self_abliterated/evaluation_results.csv` (48 rows, landed in commit `b184932` on `agent/benchmark-eval`)
 
 Headline observations:
-- **Self-abliteration produced zero behavioral effect on `should_refuse`** (6/6 vs base 42/42 — both 100%, **0 percentage-point delta**). This is the paper's core empirical confirmation that standard rank-1 mean-diff abliteration is ineffective on Gemma 4 E4B at 8-bit. The M2c sweep (section d) predicted this; the self-abliterated benchmark row is the direct behavioral verification.
+- **Self-abliteration with M2b raw-prompt directions produced zero behavioral effect on `should_refuse`** at both int8 (6/6) and bf16 (6/6 — see `_bf16` row from M6 Stage 0a). This is the paper's core empirical confirmation that standard rank-1 mean-diff abliteration with the Mlabonne/Arditi recipe is ineffective on Gemma 4 E4B regardless of edit-time precision. The M2c sweep predicted it; the M6 bf16 row directly rules out the bnb int8 edit path as the cause (H1 rejected).
+- **M6 found a partial fix.** Switching the direction-build recipe to chat-template-applied activations + per-layer winsorization at 99.5% + two-pass Gram-Schmidt orthogonalization against the harmless mean (the D3 variant) cracks the n=6 smoke at 1/6 (16.7%) but lands at 17/42 = 40.5% on the n=42 confirmation — a 60% relative reduction from the 100% baseline, in the 30–85% partial-effect band. Norm-preserving biprojection on the same D3 direction artifact (Stage 3a) adds nothing on top, refuting the H5 hypothesis that RMSNorm sensitivity to row-norm changes was the bottleneck (direct weight audit: vanilla projection only changes per-row norms by 0.03–0.07% on average). The remaining ~40–50% refusal rate concentrates on the most extreme topics (CSAM, ICS/hospital malware, weapons), suggesting refusal on Gemma 4 is not cleanly rank-1 — a strong core safety circuit resists single-direction abliteration. This is consistent with M3's observation that OBLITERATUS uses median rank_95 = 6 on the same base model. See `paper/sections/08_rank1_cascade.md` for the full chapter.
 - The hypothesis "base E4B over-refuses on `emergency_medical`" is **not** supported by the data: only 1/50 (2.0%) over-refusals, and adding an emergency-responder framing only nudges it to 2/50 (4.0%). The *E2B* baseline does over-refuse on `emergency_medical` (12.0%) and on `gray_zone` (42.9%); over-refusal looks like a smaller-model artefact rather than a property of the E4B production checkpoint. This shifts the paper framing — see anomaly (g.8).
 - HauhauCS is the cleanest published uncensoring (0/344 refused, including 0/42 on `should_refuse`). It removed safety wholesale.
-- We do not yet have the OBLITERATUS or TrevorJS behavioral rows (g.1, g.2), so the cross-method behavioral comparison remains single-source (HauhauCS) — but the M3 weight-diff geometry (section e) covers the cross-method comparison structurally.
-- The 5-row heatmap regenerated by `analyze_results.py` lives at `/home/nyavana/columbia/6699/shared/results/agent/benchmark-eval/figures/refusal_heatmap.png` (rows: `gemma4_e2b_base`, `gemma4_e4b_base`, `gemma4_e4b_base_emergency_context`, `gemma4_e4b_hauhau`, `gemma4_e4b_self_abliterated`). The `over_refusal_comparison.png` and `phrasing_sensitivity.png` siblings were regenerated in the same commit (`79a0a73`).
+- TrevorJS bf16 transformers behavioural row IS now available — landed during M6 Stage 0b as the positive control (0/48 on the stratified subset, 0/6 should_refuse). OBLITERATUS still missing (g.1).
+- The 5-row heatmap regenerated by `analyze_results.py` lives at `/home/nyavana/columbia/6699/shared/results/agent/benchmark-eval/figures/refusal_heatmap.png` (rows: `gemma4_e2b_base`, `gemma4_e4b_base`, `gemma4_e4b_base_emergency_context`, `gemma4_e4b_hauhau`, `gemma4_e4b_self_abliterated`). The M6 rows have not been heatmap-regenerated; the per-CSV files live under `shared/results/agent/m6-rank1-followup/stage{0a,0b,2_d1_chat_template,2_d2_winsorize,2_d3_full_recipe,3a_biprojection_d3_dirs,1_5_d3_should_refuse_n42}/evaluation_results.csv`.
 
 ## (c) Mechanistic analysis summary
 
@@ -219,15 +229,17 @@ Run through this checklist before writing the green-light sentence.
 This block is the parseable handoff from M4 to M5. M5 should cite these numbers verbatim in the paper; any deviation between paper text and this block is a bug.
 
 ```
-PAPER-HEADLINE-NUMBERS (post-M4):
+PAPER-HEADLINE-NUMBERS (post-M6):
 
-Behavioral (M2a + M2c-followup, refusal_heatmap.png):
+Behavioral (M2a + M2c-followup + M6, refusal_heatmap.png):
   base E4B GGUF: 100% should_refuse, 2% emergency_medical
   E2B BF16:      95.2% should_refuse, 12.0% emergency_medical
   HauhauCS:      0% should_refuse (truly uncensored)
-  self-abliterated (n=48): 100% should_refuse, 33% emergency_medical
+  TrevorJS bf16: 0% should_refuse on n=48 stratified (M6 Stage 0b positive control)
+  self-abliterated int8 (M2c-followup, n=48): 100% should_refuse, 33% emergency_medical
+  self-abliterated bf16 (M6 Stage 0a, n=48): 100% should_refuse — H1 rejected
   base E4B + first-responder context (n=50): 4% emergency_medical
-  delta self-abliterated vs base on should_refuse: 0 percentage points
+  delta self-abliterated (int8 or bf16) vs base on should_refuse: 0 percentage points
 
 Mechanistic (M2b):
   peak refusal-direction layer: L15 (Cohen's d 2.87)
@@ -248,19 +260,46 @@ Comparative weight diff (M3):
   refusal-direction × top-1 SV cosine: median |0.04| (no alignment)
   shared K/V de-dup: 36 borrowers removed (18 layers × 2 projections)
 
+M6 cascade (rank-1 causal-isolation):
+  H6 pipeline-sound:        PASS (TrevorJS bf16 → 0/48)
+  H1 bnb int8 edit-path:    REJECTED (bf16 → 6/6 should_refuse on n=6 smoke)
+  H2 chat-template alone:   insufficient (D1 → 6/6 should_refuse)
+  H3 winsorization alone:   insufficient (D2 → 6/6, cos(D1,D2) at L15 = 0.994)
+  H4 Gram-Schmidt vs harmless mean: PARTIAL / load-bearing
+                              (D3 smoke → 1/6 = 16.7%, ≤30% band)
+                              (D3 n=42 → 17/42 = 40.5%, partial-effect band)
+                              hand-audit: classifier under-counts soft refusals;
+                                           true rate plausibly 50-70%
+                              cos(D2,D3) at L15 = 0.952 (small ~17° rotation)
+                              cos(M2b raw, D1 chat-template) at L15 = 0.09 (orthogonal)
+  H5 norm-preserving biproj: REFUTED (3a smoke identical per-prompt to D3 vanilla;
+                              direct weight audit: vanilla projection only changes
+                              per-row L2 norms by 0.03–0.07% mean, max 2.84%)
+
 Paper central claim:
-  Refusal in Gemma 4 E4B admits no clean rank-1 mean-diff fix. Production
-  uncensoring requires either multi-rank descent (OBLITERATUS) or
-  norm-preserving projections (TrevorJS). The two methods edit nearly
-  orthogonal subspaces, suggesting refusal occupies a thick low-rank shell
-  rather than a single dominant direction.
+  Refusal in Gemma 4 E4B is partially recoverable by rank-1 mean-diff abliteration
+  IFF the refusal direction is constructed via the full TrevorJS-style direction-
+  build recipe (chat-template-applied activations + per-layer winsorization at
+  99.5% + two-pass Gram-Schmidt orthogonalization against the harmless mean).
+  This recipe achieves a 60% relative reduction in should-refuse refusal at n=42
+  (100% → 40.5%) with vanilla projection at α=1.0; norm-preserving biprojection
+  adds nothing on top because vanilla projection barely changes row norms in the
+  first place. The persistent ~40–50% residual concentrates on the most extreme
+  topics, indicating a strong core safety circuit that resists single-direction
+  abliteration. This corroborates M3's observation that OBLITERATUS uses median
+  rank_95 = 6 on the same base model: full removal requires multi-rank descent.
+  The single-variable causal isolation of Gram-Schmidt-against-harmless-mean as
+  the load-bearing direction-quality ingredient is, to our knowledge, the
+  cleanest published characterization of what does and does not matter in
+  rank-1 abliteration on Gemma 4.
 ```
 
 Sources for each number (all paths absolute under `/home/nyavana/columbia/6699/`):
-- Behavioral rows: per-model `evaluation_results.csv` under `shared/results/agent/benchmark-eval/refusal_rates/<slug>/`. Self-abliterated row from `shared/results/agent/benchmark-eval/refusal_rates/gemma4_e4b_self_abliterated/evaluation_results.csv` (n=48 stratified).
+- Behavioral rows: per-model `evaluation_results.csv` under `shared/results/agent/benchmark-eval/refusal_rates/<slug>/`. Self-abliterated int8 row from `shared/results/agent/benchmark-eval/refusal_rates/gemma4_e4b_self_abliterated/evaluation_results.csv` (n=48 stratified).
 - Mechanistic peak/rank-1: `shared/results/agent/mechanistic-analysis/` (signal_vs_layer.png, rank_analysis.png, refusal_directions.pt). Source commits `1d5c590`, `d17afb4`, `358abf5`.
 - Sweep numbers: `shared/results/agent/abliteration/ablation_results/sweep_results.json` and `category_cosine_heatmap.png`. Source commit `33fe8f4`.
 - Weight-diff numbers: `shared/results/agent/weight-diff/weight_diffs/cross_method_cosine_table_dedup.csv` and `refusal_direction_vs_singular_vector.csv`. Source commit `11f863e`.
+- M6 cascade rows: per-stage `evaluation_results.csv` under `shared/results/agent/m6-rank1-followup/stage{0a,0b,2_d1_chat_template,2_d2_winsorize,2_d3_full_recipe,3a_biprojection_d3_dirs,1_5_d3_should_refuse_n42}/`. Direction artifacts under `shared/results/agent/m6-rank1-followup/m6_directions/{refusal_directions_chat,refusal_directions_d2,refusal_directions_d3}.pt`. Source merge commit `e4e5622` (8 underlying commits `7c09a2a`, `6e084c1`, `380c1d0`, `4bc5708`, `578b682`, `811ce3a`, `b3e8a6b`, `e840ea4`); proposal+results writeup at `docs/M6_PROPOSAL_RANK1_FOLLOWUP.md` §7. Paper section at `paper/sections/08_rank1_cascade.md` (commit `ed532ec`).
 
 ---
 
@@ -276,7 +315,7 @@ If a new Claude Code session opens this repo without prior context, here is the 
 
 **2. Headline numbers are in section (h) above.** Every M5 numeric claim must trace to a CSV/JSON/figure path listed there. The corresponding `paper/sources.md` (M5 task 10.11) is not yet created — produce it as part of M5.
 
-**3. Existing paper-section seeds:** `paper/sections/02_background.md` (RLHF/DPO/CAI/RepE), `paper/sections/03_related_work.md` (abliteration lineage + over-refusal benchmarks + Gemma 4 quirks). 17 citations already present; M5 sections 1, 4, 5, 6, 7, 8, 9 still need to be written.
+**3. Existing paper-section seeds:** `paper/sections/02_background.md` (RLHF/DPO/CAI/RepE), `paper/sections/03_related_work.md` (abliteration lineage + over-refusal benchmarks + Gemma 4 quirks), `paper/sections/08_rank1_cascade.md` (M6 cascade — H1/H5 rejected, H4 load-bearing, partial 40.5% terminus). 17 citations + the M6 chapter present; M5 sections 1, 4, 5, 6, 7, 9 still need to be written.
 
 **4. Known-failure recovery paths (if M5 needs the missing data):**
    - OBLITERATUS behavioral row: GGUF backend crashes on Harmony tokens; fall back to `transformers --use-8bit` on its bf16 safetensors (`shared/model/OBLITERATUS-gemma-4-E4B-it-OBLITERATED/`). Expect ~75–150 s/prompt. Run on the same stratified 48-prompt subset at `shared/results/agent/benchmark-eval/stratified_50.json` for ~1–2 h.

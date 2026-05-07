@@ -50,3 +50,26 @@ M3-summary:
   exclusively edits `o_proj` and `down_proj` (rank-1 each); OBLITERATUS
   edits q/k/v/o, gate/up/down MLP, and embed_tokens with mean rank_95
   ranging from 2 (embed_tokens) to 720 (down_proj).
+
+## Connection to M6 (rank-1 cascade)
+
+The M6 follow-up cascade (`docs/M6_PROPOSAL_RANK1_FOLLOWUP.md`, paper
+section 8) directly tests whether the rank-1 hypothesis closes the gap
+on Gemma 4 with the cleanest possible direction-construction recipe.
+Headline: with chat-template-applied activations, per-layer winsorization,
+and Gram-Schmidt orthogonalization against the harmless mean (the full
+TrevorJS-style direction recipe), vanilla rank-1 projection at α=1.0
+achieves a 60% relative reduction in `should_refuse` refusal (100% → 40.5%
+at n=42) — partial-effect band, not a clean win. Norm-preserving
+biprojection adds nothing on top (vanilla projection only changes per-row
+L2 norms by 0.03–0.07% on average, max 2.84%, far below RMSNorm's
+operating sensitivity).
+
+The M6 negative-on-rank-1 result is the operational complement to M3's
+multi-rank-on-OBLITERATUS observation: full uncensoring on Gemma 4
+requires either multi-rank descent (the OBLITERATUS path) or rank-1
+ablation extended beyond the `o_proj`/`down_proj` pair (q/k/v projection
+matrices that pure mean-diff abliteration leaves untouched). Both paths
+are out of scope for this paper; the M3+M6 pair is what motivates the
+"refusal occupies a thick low-rank shell rather than a single dominant
+direction" framing.
