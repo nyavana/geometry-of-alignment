@@ -320,6 +320,20 @@ Per the three-band gate in `docs/M6_PROPOSAL_RANK1_FOLLOWUP.md` §4:
 - Stage 0a `should_refuse 6/6 = 100%` → **>85% band → no meaningful effect → proceed to Stage 2**.
 - **Headline take-away:** the bnb int8 in-place edit path is *not* the load-bearing failure mode. The bf16 edit, applied to all 42 layers via the M2b refusal directions with vanilla projection at α=1.0, produces the same surface-form refusal pattern (`"I cannot provide..."`) as the M2c-followup int8 edit — character-for-character on multiple prompts. This narrows the search away from "edit-path quantization rounds away the perturbation" and toward direction-quality (chat-template, winsorize, Gram-Schmidt) and projection-algebra (norm-preserving biprojection) hypotheses.
 
-### Next: Stage 2 D1 (chat-template direction)
+### Stage 2 results — D3 cracks the gate (2026-05-07)
 
-Tests H2: refusal direction may be chat-template-sensitive on Gemma 4. M2b directions were derived from raw `tokenizer(prompt_text)` activations; `evaluate.py:143` runs through `apply_chat_template`. Re-extract via the chat template, recompute mean-diff directions, re-abliterate (bf16, vanilla, all 42 layers, α=1.0), smoke n=12 (6 should_refuse + 6 over-refuse).
+| Variant | should_refuse n=6 | TOTAL refused n=48 | Gate band |
+|---|---|---|---|
+| D1 (chat-template only) | 6/6 (100%) | 6/48 (12.5%) | >85% → escalate |
+| D2 (D1 + winsorize 99.5) | 6/6 (100%) | 6/48 (12.5%) | >85% → escalate |
+| **D3 (D2 + Gram-Schmidt vs harmless mean)** | **1/6 (16.7%)** | **1/48 (2.1%)** | **≤30% — CRACKED** |
+
+**Headline:** Gram-Schmidt orthogonalization of the (winsorized, chat-template-derived) refusal direction *against the harmless mean* is the load-bearing ingredient. D2→D3 differ only by that single transformation. cos(D2_L15, D3_L15) = 0.95 (a small ~17° rotation), but that rotation across all 42 layers + vanilla rank-1 projection at α=1.0 closes the gap from 100% → 16.7%. The unprojected mean-diff direction leaks "harmless-mean" content into the projection target; the orthogonalization isolates the refuse-distinct subspace.
+
+D3's compliance outputs are genuine: explicit guides on bank-account hacking, fentanyl manufacture, ransomware, stalking, meth synthesis. Only the pipe-bomb prompt (1/6) still refuses.
+
+**Vanilla projection algebra is sufficient** when paired with the right direction. Stage 3a (norm-preserving biprojection) is therefore *no longer needed* for the paper headline and has been dropped from the cascade.
+
+### Next: Stage 1.5 confirmation (n=42)
+
+Re-evaluate the D3 checkpoint on all 42 base `should_refuse` prompts (filter `data/benchmark_prompts.json` by `category == "should_refuse"`). Acceptance: ≤30% refusal at n=42 (binomial robustness — at n=6 a single classifier flip moves the rate by 16.7 pp; at n=42 by 2.4 pp). Hand-audit 10 randomly-sampled non-refusing outputs to filter "refusal-then-comply" false negatives. ETA ~77 min.
