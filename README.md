@@ -185,11 +185,13 @@ python -m src.weight_diff.svd_analysis \
 
 ## Status
 
-Experimental work for the EECS 6699 final project is complete (M0–M4); paper
-write-up (M5) is the next phase. See `STATUS_FOR_HUMAN.md` at the repo root
-for the operator-review status doc with all headline numbers, figure paths,
-and verification checklist; `docs/project_plan.md` for the full execution
-plan; `docs/project_proposal.md` for the original proposal.
+Experimental work for the EECS 6699 final project is complete (M0–M4 + M6);
+paper write-up (M5) is in progress (section 8 drafted; sections 1, 4, 5, 6,
+7, 9 pending). See `STATUS_FOR_HUMAN.md` at the repo root for the
+operator-review status doc with all headline numbers, figure paths, and
+verification checklist; `docs/M6_PROPOSAL_RANK1_FOLLOWUP.md` for the M6
+cascade design + per-stage results; `docs/project_plan.md` for the original
+execution plan; `docs/project_proposal.md` for the original proposal.
 
 ### Headline findings
 
@@ -202,14 +204,30 @@ plan; `docs/project_proposal.md` for the original proposal.
   modify nearly orthogonal subspaces (median |cos| = 0.08) and neither's
   top-1 singular vector aligns with M2b's activation direction (median
   |cos| ≈ 0.04).
-- **Standard rank-1 mean-diff abliteration is empirically ineffective on
-  Gemma 4 E4B 8-bit.** The M2c sweep (α∈[0, 2.0], 9 layer subsets, random
-  control) leaves refusal flat at 30–35% on the stratified subset; the
-  self-abliterated model's `should_refuse` rate is 100% (unchanged from
-  base). This confirms predicted RMSNorm + shared-K/V resistance and
-  constitutes a clean negative finding: refusal admits no clean rank-1
-  fix in this architecture even though the activation direction itself
-  looks rank-1.
+- **Standard rank-1 mean-diff abliteration with the Mlabonne/Arditi recipe
+  is empirically ineffective on Gemma 4 E4B**, regardless of edit-time
+  precision. The M2c sweep (α∈[0, 2.0], 9 layer subsets, random control)
+  leaves the int8 self-abliterated model's `should_refuse` rate at 100%;
+  M6 Stage 0a confirms the same 100% under bf16 in-place edit, ruling out
+  the bnb int8 path as the cause.
+- **A single direction-quality ingredient is load-bearing on Gemma 4: two-
+  pass Gram-Schmidt orthogonalization of the refusal direction against the
+  harmless mean.** M6 isolates this via a five-stage causal cascade. With
+  this step (D3 variant: chat-template-applied activations + per-layer
+  winsorization at 99.5% + Gram-Schmidt vs harmless mean), vanilla rank-1
+  projection at α=1.0 cuts `should_refuse` from 100% to 40.5% at n=42 — a
+  60% relative reduction. Without it, no variant tested affects
+  `should_refuse` at all. Norm-preserving biprojection adds nothing on top
+  (H5 refuted): vanilla projection only changes per-row L2 norms by
+  0.03–0.07% on average (max 2.84%), so there is essentially no row-norm
+  change for biprojection to preserve.
+- **Refusal on Gemma 4 is not cleanly a rank-1 phenomenon.** The persistent
+  ~40-50% residual after the cleanest rank-1 recipe concentrates on the
+  most extreme topics (CSAM, ICS/hospital malware, weapons), suggesting a
+  strong core safety circuit that single-direction abliteration cannot
+  reach. This corroborates M3's observation that OBLITERATUS uses median
+  rank_95 = 6 to fully uncensor the same base model. Full removal needs
+  multi-rank descent (out of scope here; future work).
 - **Selective safety geometry is clean.** Per-category refusal directions
   (emergency_medical, wilderness_survival, home_safety, chemistry_safety,
   mental_health) form a tight +0.93 pairwise cluster and are orthogonal to
@@ -222,7 +240,9 @@ plan; `docs/project_proposal.md` for the original proposal.
   (12% / 95.2%). The "models refuse helpful medical questions" trope is
   not a strong feature of the Gemma 4 family on this benchmark.
 
-See `STATUS_FOR_HUMAN.md` for the full table and source-CSV citations.
+See `STATUS_FOR_HUMAN.md` (b) for the full benchmark table and (h) for
+paper-grade headline numbers; `docs/M6_PROPOSAL_RANK1_FOLLOWUP.md` §7 and
+`paper/sections/08_rank1_cascade.md` for the M6 cascade.
 
 ## License
 
