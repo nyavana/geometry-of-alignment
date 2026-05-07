@@ -113,7 +113,8 @@ def evaluate_with_llamacpp(server_url: str, model_name: str,
 def evaluate_with_transformers(model, tokenizer, benchmark_path: str,
                                output_path: str,
                                limit: int = None,
-                               base_only: bool = False) -> list[dict]:
+                               base_only: bool = False,
+                               max_new_tokens: int = 512) -> list[dict]:
     """
     Evaluate a transformers model (e.g., after abliteration).
     Accepts pre-loaded model and tokenizer objects.
@@ -159,7 +160,8 @@ def evaluate_with_transformers(model, tokenizer, benchmark_path: str,
 
         with torch.no_grad():
             output_ids = model.generate(
-                **model_inputs, max_new_tokens=512, temperature=0.1, do_sample=True,
+                **model_inputs, max_new_tokens=max_new_tokens,
+                temperature=0.1, do_sample=True,
             )
 
         response_text = tokenizer.decode(
@@ -256,6 +258,9 @@ def main():
                         help="Evaluate only the first N prompts (useful for smoke tests)")
     parser.add_argument("--base-only", action="store_true",
                         help="Skip variants, evaluate only the canonical base prompt per entry")
+    parser.add_argument("--max-new-tokens", type=int, default=512,
+                        help="Generation cap; refusal classification needs ~50 tokens, "
+                             "so 128 is safe for smoke runs and ~4x faster than 512.")
     args = parser.parse_args()
 
     if args.backend == "llamacpp":
@@ -279,7 +284,8 @@ def main():
             )
         model.eval()
         evaluate_with_transformers(model, tokenizer, args.benchmark, args.output,
-                                   limit=args.limit, base_only=args.base_only)
+                                   limit=args.limit, base_only=args.base_only,
+                                   max_new_tokens=args.max_new_tokens)
 
 
 if __name__ == "__main__":

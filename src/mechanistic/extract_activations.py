@@ -132,13 +132,20 @@ class ActivationCollector:
 
 def extract_activations_for_prompts(model, tokenizer, prompts: list[str],
                                      collector: ActivationCollector,
-                                     position: str = "last") -> dict:
+                                     position: str = "last",
+                                     use_chat_template: bool = False) -> dict:
     """
     Run forward pass on each prompt and collect activations.
 
     Args:
         position: "last" = take last token position
                   "mean" = mean over all positions
+        use_chat_template: if True, route the prompt through
+            tokenizer.apply_chat_template(..., add_generation_prompt=True)
+            so the input matches the inference-time path used by
+            src/benchmark/evaluate.py:143. The last-token position then
+            sits at the model-turn-start marker, which is exactly where
+            the LM decides to refuse vs comply.
 
     Returns:
         Dict[layer_idx, Tensor of shape (num_prompts, hidden_dim)]
@@ -146,7 +153,19 @@ def extract_activations_for_prompts(model, tokenizer, prompts: list[str],
     all_activations = defaultdict(list)
 
     for prompt_text in tqdm(prompts, desc="Extracting activations"):
-        inputs = tokenizer(prompt_text, return_tensors="pt").to(model.device)
+        if use_chat_template:
+            messages = [{"role": "user", "content": prompt_text}]
+            template_output = tokenizer.apply_chat_template(
+                messages, return_tensors="pt", add_generation_prompt=True,
+                return_dict=True,
+            )
+            if hasattr(template_output, "input_ids"):
+                inputs = {k: v.to(model.device) for k, v in template_output.items()
+                          if hasattr(v, "to")}
+            else:
+                inputs = {"input_ids": template_output.to(model.device)}
+        else:
+            inputs = tokenizer(prompt_text, return_tensors="pt").to(model.device)
 
         collector.clear()
         with torch.no_grad():
@@ -192,7 +211,14 @@ def main():
     parser.add_argument("--use-8bit", action="store_true")
     parser.add_argument("--output", default="results/activations/")
     parser.add_argument("--position", default="last", choices=["last", "mean"])
+    parser.add_argument("--use-chat-template", action="store_true",
+                        help="Route prompts through tokenizer.apply_chat_template "
+                             "(add_generation_prompt=True), matching evaluate.py:143. "
+                             "Output files get a '_chat' suffix to avoid clobbering "
+                             "the M2b artifact.")
     args = parser.parse_args()
+
+    suffix = "_chat" if args.use_chat_template else ""
 
     # Load benchmark
     with open(args.benchmark) as f:
@@ -228,34 +254,38 @@ def main():
     collector.register_hooks()
 
     # Extract
-    print("\nExtracting REFUSE activations...")
+    print("\nExtracting REFUSE activations"
+          f"{' (chat-template)' if args.use_chat_template else ''}...")
     refuse_acts = extract_activations_for_prompts(
-        model, tokenizer, refuse_prompts, collector, position=args.position
+        model, tokenizer, refuse_prompts, collector,
+        position=args.position, use_chat_template=args.use_chat_template,
     )
 
-    print("\nExtracting COMPLY activations...")
+    print("\nExtracting COMPLY activations"
+          f"{' (chat-template)' if args.use_chat_template else ''}...")
     comply_acts = extract_activations_for_prompts(
-        model, tokenizer, comply_prompts, collector, position=args.position
+        model, tokenizer, comply_prompts, collector,
+        position=args.position, use_chat_template=args.use_chat_template,
     )
 
     # Save activations
     output_dir = Path(args.output)
     output_dir.mkdir(parents=True, exist_ok=True)
-    torch.save(refuse_acts, output_dir / "refuse_activations.pt")
-    torch.save(comply_acts, output_dir / "comply_activations.pt")
+    torch.save(refuse_acts, output_dir / f"refuse_activations{suffix}.pt")
+    torch.save(comply_acts, output_dir / f"comply_activations{suffix}.pt")
     print(f"\nSaved activations to {output_dir}")
 
     # Save per-prompt metadata (row index in {refuse,comply}_activations.pt
     # aligns with list index in metadata["refuse"] / metadata["comply"]).
     metadata = {"refuse": refuse_records, "comply": comply_records}
-    with open(output_dir / "prompt_metadata.json", "w") as f:
+    with open(output_dir / f"prompt_metadata{suffix}.json", "w") as f:
         json.dump(metadata, f, indent=2)
     print(f"Saved prompt metadata: "
           f"{len(refuse_records)} refuse rows, {len(comply_records)} comply rows")
 
     # Compute and save refusal directions
     directions = compute_refusal_directions(refuse_acts, comply_acts)
-    torch.save(directions, output_dir / "refusal_directions.pt")
+    torch.save(directions, output_dir / f"refusal_directions{suffix}.pt")
     print(f"Saved refusal directions for {len(directions)} layers")
 
     collector.remove_hooks()
