@@ -58,7 +58,8 @@ def compute_refusal_direction(refuse_acts: dict, comply_acts: dict,
 def abliterate_model(model, refusal_directions: dict,
                      layers_to_modify: list[int] | None = None,
                      alpha: float = 1.0,
-                     target_weights: str = "residual"):
+                     target_weights: str = "residual",
+                     norm_preserving: bool = False):
     """
     Apply abliteration to a model in-place.
 
@@ -73,6 +74,12 @@ def abliterate_model(model, refusal_directions: dict,
             "residual" — both attention and MLP output projections
             "mlp"      — MLP output projection only
             "attn"     — attention output projection only
+        norm_preserving: if True, rescale each row of W after projection
+            so that ‖W'_i‖ == ‖W_i‖ for every row i. Targets RMSNorm
+            sensitivity to row-norm changes (TrevorJS biprojection style).
+            Removes the d-component from the column space (output) while
+            keeping per-row magnitude untouched, since uniform rescaling
+            of a row does not reintroduce d-content.
     """
     if layers_to_modify is None:
         layers_to_modify = list(refusal_directions.keys())
@@ -95,12 +102,25 @@ def abliterate_model(model, refusal_directions: dict,
             layer = model.model.layers[layer_idx]
 
         def _project_out(weight_matrix, directions, alpha):
-            """W_new = W - alpha * sum(d * (d^T @ W)) for each direction d."""
+            """W_new = W - alpha * sum(d * (d^T @ W)) for each direction d.
+
+            If norm_preserving is set on the outer abliterate_model call,
+            each row of W is rescaled afterward so that
+            ‖W'_i‖ == ‖W_i‖ — preserving RMSNorm-relevant row magnitudes
+            while still removing the d-component from the residual-stream
+            output (uniform per-row scaling does not reintroduce
+            d-content).
+            """
             W = weight_matrix.data.float()
+            if norm_preserving:
+                row_norms_orig = W.norm(dim=1, keepdim=True).clamp(min=1e-12)
             for d in directions:
                 d = d.to(W.device)
                 proj = d @ W  # (in_features,)
                 W = W - alpha * torch.outer(d, proj)
+            if norm_preserving:
+                row_norms_proj = W.norm(dim=1, keepdim=True).clamp(min=1e-12)
+                W = W * (row_norms_orig / row_norms_proj)
             weight_matrix.data = W.to(weight_matrix.dtype)
 
         if target_weights in ("attn", "residual"):
@@ -138,6 +158,11 @@ def main():
     parser.add_argument("--target-weights", default="residual",
                         choices=["residual", "mlp", "attn"])
     parser.add_argument("--use-8bit", action="store_true")
+    parser.add_argument("--norm-preserving", action="store_true",
+                        help="After rank-1 projection, rescale each row of W "
+                             "so that ‖W'_i‖ == ‖W_i‖ — RMSNorm-sensitive on "
+                             "Gemma 4. Stage 3a hypothesis: vanilla projection "
+                             "fails because it changes row norms.")
     parser.add_argument("--output", default="models/gemma-4-e4b-abliterated/")
     args = parser.parse_args()
 
@@ -172,7 +197,8 @@ def main():
         )
 
     # Abliterate
-    abliterate_model(model, directions, layers, args.alpha, args.target_weights)
+    abliterate_model(model, directions, layers, args.alpha, args.target_weights,
+                     norm_preserving=args.norm_preserving)
 
     # Save
     save_abliterated_model(model, tokenizer, args.output)
