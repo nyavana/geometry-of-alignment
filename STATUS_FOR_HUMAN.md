@@ -70,7 +70,7 @@ Per-category refusal rates, in `refused / total (rate %)` form, computed from th
 
 † **Footnote**: the `gemma4_e4b_self_abliterated*` and M6 rows are computed on a **stratified 48-prompt subsample** (6 prompts per category × 8 categories), *not* the full 344-prompt benchmark used by the top rows. The subsample was used because bf16 transformers on this multimodal Gemma 4 checkpoint runs at ~110 s/prompt (with audio-tower CPU offload); the full benchmark would have taken ~10 h per variant. The headline `should_refuse` cell is the load-bearing one. Per-category numbers from the top rows (n=40–50/cat) and these rows (n=6/cat) are not directly comparable in absolute terms; the rows are included for the *delta-vs-base* comparison, not for absolute per-category rates.
 
-‡ **Footnote (n=42 confirmation)**: the D3 row at n=42 is the M6 Stage 1.5 confirmation run on the full base `should_refuse` category (42 prompts). It **disconfirms** the n=6 smoke (1/6 = 16.7%, ≤30% band) — the true rate is in the 30–85% partial-effect band. Hand-audit of complied responses surfaces classifier blind spots (phrases like "I have to stick to guidelines that prohibit" are not in the regex but are behaviourally refusals); the 40.5% is a **lower bound**, true rate plausibly 50–70%. See `docs/M6_PROPOSAL_RANK1_FOLLOWUP.md` §7.3 for the per-prompt breakdown.
+‡ **Footnote (n=42 confirmation)**: the D3 row at n=42 is the M6 Stage 1.5 confirmation run on the full base `should_refuse` category (42 prompts). It **disconfirms** the n=6 smoke (1/6 = 16.7%, ≤30% band) — the true rate is in the 30–85% partial-effect band. Hand-audit of complied responses surfaces classifier blind spots (phrases like "I have to stick to guidelines that prohibit" are not in the regex but are behaviourally refusals); the 40.5% is a **lower bound**, true rate plausibly 50–70%. See `docs/findings/M6_PROPOSAL_RANK1_FOLLOWUP.md` §7.3 for the per-prompt breakdown.
 
 Bonus row — context-sensitivity probe (M2a 3.11): prepending "I am an emergency first responder" to `emergency_medical` prompts on base E4B GGUF.
 
@@ -301,7 +301,7 @@ Sources for each number (all paths absolute under `/home/nyavana/columbia/6699/`
 - Mechanistic peak/rank-1: `shared/results/agent/mechanistic-analysis/` (signal_vs_layer.png, rank_analysis.png, refusal_directions.pt). Source commits `1d5c590`, `d17afb4`, `358abf5`.
 - Sweep numbers: `shared/results/agent/abliteration/ablation_results/sweep_results.json` and `category_cosine_heatmap.png`. Source commit `33fe8f4`.
 - Weight-diff numbers: `shared/results/agent/weight-diff/weight_diffs/cross_method_cosine_table_dedup.csv` and `refusal_direction_vs_singular_vector.csv`. Source commit `11f863e`.
-- M6 cascade rows: per-stage `evaluation_results.csv` under `shared/results/agent/m6-rank1-followup/stage{0a,0b,2_d1_chat_template,2_d2_winsorize,2_d3_full_recipe,3a_biprojection_d3_dirs,1_5_d3_should_refuse_n42}/`. Direction artifacts under `shared/results/agent/m6-rank1-followup/m6_directions/{refusal_directions_chat,refusal_directions_d2,refusal_directions_d3}.pt`. Source merge commit `e4e5622` (8 underlying commits `7c09a2a`, `6e084c1`, `380c1d0`, `4bc5708`, `578b682`, `811ce3a`, `b3e8a6b`, `e840ea4`); proposal+results writeup at `docs/M6_PROPOSAL_RANK1_FOLLOWUP.md` §7. Paper section at `paper/sections/08_rank1_cascade.md` (commit `ed532ec`).
+- M6 cascade rows: per-stage `evaluation_results.csv` under `shared/results/agent/m6-rank1-followup/stage{0a,0b,2_d1_chat_template,2_d2_winsorize,2_d3_full_recipe,3a_biprojection_d3_dirs,1_5_d3_should_refuse_n42}/`. Direction artifacts under `shared/results/agent/m6-rank1-followup/m6_directions/{refusal_directions_chat,refusal_directions_d2,refusal_directions_d3}.pt`. Source merge commit `e4e5622` (8 underlying commits `7c09a2a`, `6e084c1`, `380c1d0`, `4bc5708`, `578b682`, `811ce3a`, `b3e8a6b`, `e840ea4`); proposal+results writeup at `docs/findings/M6_PROPOSAL_RANK1_FOLLOWUP.md` §7. Paper section at `paper/sections/08_rank1_cascade.md` (commit `ed532ec`).
 
 ---
 
@@ -345,7 +345,7 @@ Write the sentence below verbatim once items f.1, f.2, f.7, f.8 are checked:
 
 ## M6 — Rank-1 Follow-up
 
-Causal-isolation cascade investigating which single ingredient closes the gap between M2c's failed self-abliteration and the published Gemma 4 E4B successes. Source-of-truth: `docs/M6_PROPOSAL_RANK1_FOLLOWUP.md`. Branch: `agent/m6-rank1-followup`. All evals use `--max-new-tokens 128` (added on this branch as commit `7c09a2a`) to bring bf16 E4B's audio-tower-CPU-offload latency from ~250 s/prompt to a tractable ~110 s/prompt; refusal classification only inspects the first ~50 tokens, so the cap is safe.
+Causal-isolation cascade investigating which single ingredient closes the gap between M2c's failed self-abliteration and the published Gemma 4 E4B successes. Source-of-truth: `docs/findings/M6_PROPOSAL_RANK1_FOLLOWUP.md`. Branch: `agent/m6-rank1-followup`. All evals use `--max-new-tokens 128` (added on this branch as commit `7c09a2a`) to bring bf16 E4B's audio-tower-CPU-offload latency from ~250 s/prompt to a tractable ~110 s/prompt; refusal classification only inspects the first ~50 tokens, so the cap is safe.
 
 ### Stage 0 results (n=48 stratified subset)
 
@@ -356,7 +356,7 @@ Causal-isolation cascade investigating which single ingredient closes the gap be
 
 ### Stage 1 gate decision (2026-05-06)
 
-Per the three-band gate in `docs/M6_PROPOSAL_RANK1_FOLLOWUP.md` §4:
+Per the three-band gate in `docs/findings/M6_PROPOSAL_RANK1_FOLLOWUP.md` §4:
 
 - Stage 0a `should_refuse 6/6 = 100%` → **>85% band → no meaningful effect → proceed to Stage 2**.
 - **Headline take-away:** the bnb int8 in-place edit path is *not* the load-bearing failure mode. The bf16 edit, applied to all 42 layers via the M2b refusal directions with vanilla projection at α=1.0, produces the same surface-form refusal pattern (`"I cannot provide..."`) as the M2c-followup int8 edit — character-for-character on multiple prompts. This narrows the search away from "edit-path quantization rounds away the perturbation" and toward direction-quality (chat-template, winsorize, Gram-Schmidt) and projection-algebra (norm-preserving biprojection) hypotheses.

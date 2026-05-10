@@ -53,7 +53,7 @@ M3-summary:
 
 ## Connection to M6 (rank-1 cascade)
 
-The M6 follow-up cascade (`docs/M6_PROPOSAL_RANK1_FOLLOWUP.md`, paper
+The M6 follow-up cascade (`docs/findings/M6_PROPOSAL_RANK1_FOLLOWUP.md`, paper
 section 8) directly tests whether the rank-1 hypothesis closes the gap
 on Gemma 4 with the cleanest possible direction-construction recipe.
 Headline: with chat-template-applied activations, per-layer winsorization,
