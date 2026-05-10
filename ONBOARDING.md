@@ -13,6 +13,19 @@ If you only have 5 minutes, read sections 1, 2, and 8.
 
 ---
 
+## Team
+
+**Team contact**: GeometryofAlignment@nyavana.io
+
+| Member | Email |
+|---|---|
+| Yang, Chenhao | cy2822@columbia.edu |
+| Zhao, Daitian | dz2585@columbia.edu |
+| Wang, Hanlin  | hw3100@columbia.edu |
+| Luo, Yuxi     | yl6117@columbia.edu |
+
+---
+
 ## Table of contents
 
 1. [What this project is, in plain English](#1-what-this-project-is-in-plain-english)
