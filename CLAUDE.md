@@ -8,6 +8,10 @@ Research project for EECS 6699 (Mathematics of Deep Learning, Columbia Universit
 
 Primary model: Gemma 4 E4B-it (42 layers, dense, GPU via 8-bit quantization) for benchmark + mechanistic + abliteration. Comparative weight-diff phase compares the base against published Gemma 4 E4B uncensored variants (OBLITERATUS, TrevorJS) on CPU using safetensors arithmetic.
 
+## Project Website
+
+V1 landing page is live at <https://geometry-of-alignment.vercel.app>. Source lives in `website/` (single static `index.html` + the six figures from `results/figures/` it embeds). Deploy from a clean checkout with `cd website && vercel --prod` against the existing Vercel project `geometry-of-alignment` under team `nyavanas-projects` (already linked via `.vercel/project.json`, which is gitignored). SSO/deployment protection is disabled on the project — public access by design. `paper.pdf` is referenced from the hero CTA but not yet committed; drop the PDF into `website/paper.pdf` when the v1.0 draft is ready.
+
 ## Worktrees & Shared Sidecar
 
 Development happens across multiple git worktrees that all sit as siblings under `/home/nyavana/columbia/6699/`:

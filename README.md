@@ -9,6 +9,12 @@ fragile that a single rank-1 weight perturbation can eliminate it, and whether
 selective de-alignment (removing over-refusal while keeping genuine safety) is
 possible.
 
+## Project Website
+
+V1 of the project landing page is live at **<https://geometry-of-alignment.vercel.app>**.
+
+Source for the site is in [`website/`](website/) — a single self-contained `index.html` plus six published figures from `results/figures/`. Deploy with `cd website && vercel --prod`. See [`website/README.md`](website/README.md) for details.
+
 ## Research Questions
 
 1. **How prevalent is over-refusal in practice?** When do aligned models
