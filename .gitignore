@@ -116,6 +116,8 @@ results/**/*.json
 !results/weight_diffs/.shared_tensor_handling.md
 !results/figures/*.png
 !results/figures/*.md
+!results/math_framework/*.csv
+!results/math_framework/*.md
 
 # =============================================================================
 # Hugging Face / cache directories
