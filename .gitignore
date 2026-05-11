@@ -118,6 +118,7 @@ results/**/*.json
 !results/figures/*.md
 !results/math_framework/*.csv
 !results/math_framework/*.md
+!results/math_framework/*.json
 
 # =============================================================================
 # Hugging Face / cache directories
