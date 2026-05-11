@@ -32,11 +32,4 @@ The hypothesis that high-level concepts are encoded as approximately linear dire
 
 Property 3 is what makes the abliteration intervention of [Arditi 2024] (Section 3 of the related-work survey) defensible as a *minimum*-perturbation intervention: if refusal really is rank-1 in the relevant subspace, then projecting it out is the smallest weight modification consistent with eliminating the behavior. Whether refusal *is* rank-1 in Gemma 4 specifically is one of the empirical questions we test.
 
-## References
-
-- [Bai 2022] Bai, Y., Kadavath, S., Kundu, S., Askell, A., et al. *Constitutional AI: Harmlessness from AI Feedback.* arXiv:2212.08073, December 2022. https://arxiv.org/abs/2212.08073
-- [Christiano 2017] Christiano, P., Leike, J., Brown, T., Martic, M., Legg, S., Amodei, D. *Deep Reinforcement Learning from Human Preferences.* arXiv:1706.03741, June 2017. https://arxiv.org/abs/1706.03741
-- [Ouyang 2022] Ouyang, L., Wu, J., Jiang, X., et al. *Training Language Models to Follow Instructions with Human Feedback (InstructGPT).* arXiv:2203.02155, March 2022. https://arxiv.org/abs/2203.02155
-- [Park 2023] Park, K., Choe, Y. J., Veitch, V. *The Linear Representation Hypothesis and the Geometry of Large Language Models.* arXiv:2311.03658, November 2023; ICML 2024. https://arxiv.org/abs/2311.03658
-- [Rafailov 2023] Rafailov, R., Sharma, A., Mitchell, E., Ermon, S., Manning, C. D., Finn, C. *Direct Preference Optimization: Your Language Model is Secretly a Reward Model.* arXiv:2305.18290, May 2023. https://arxiv.org/abs/2305.18290
-- [Zou 2023] Zou, A., Phan, L., Chen, S., Campbell, J., Guo, P., Ren, R., et al. *Representation Engineering: A Top-Down Approach to AI Transparency.* arXiv:2310.01405, October 2023. https://arxiv.org/abs/2310.01405
+*Bibliography consolidated in `paper/references.md`.*

@@ -42,16 +42,4 @@ The standard transformer-block assumption underlying [Arditi 2024]'s and [Mlabon
 
 **Implications for this paper.** These three quirks shape the experimental design of Sections 6 and 7 in concrete ways: (i) the per-layer signal-strength analysis in Section 6 separates global from local attention layers when picking the "peak refusal layer"; (ii) the abliteration variant in Section 7 follows [grimjim 2025]'s norm-preserving form rather than the original [Arditi 2024] rank-1 form, to avoid the RMSNorm-row-norm interaction; (iii) the comparative weight-diff in Section 7 explicitly de-duplicates shared K/V tensors before computing per-layer Frobenius distances, since otherwise the OBLITERATUS v2-style 18-fold repeated projection would inflate the comparison artificially.
 
-## References
-
-- [Arditi 2024] Arditi, A., Obeso, O., Syed, A., Paleka, D., Panickssery, N., Gurnee, W., Nanda, N. *Refusal in Language Models is Mediated by a Single Direction.* arXiv:2406.11717, June 2024. https://arxiv.org/abs/2406.11717
-- [Cui 2024] Cui, J., Chiang, W.-L., Stoica, I., Hsieh, C.-J. *OR-Bench: An Over-Refusal Benchmark for Large Language Models.* arXiv:2405.20947, May 2024; ICML 2025. https://arxiv.org/abs/2405.20947
-- [elder-plinius 2025] elder-plinius. *OBLITERATUS: Gemma-4-E4B-it-OBLITERATED model card and toolkit.* HuggingFace + GitHub, 2025. https://huggingface.co/OBLITERATUS/gemma-4-E4B-it-OBLITERATED ; https://github.com/elder-plinius/OBLITERATUS
-- [Gemma Team 2025] Gemma Team (Google DeepMind). *Gemma 3 Technical Report.* arXiv:2503.19786, March 2025. https://arxiv.org/abs/2503.19786
-- [grimjim 2025] Lai, J. (grimjim). *Norm-Preserving Biprojected Abliteration.* HuggingFace blog, November 2025. https://huggingface.co/blog/grimjim/norm-preserving-biprojected-abliteration
-- [Heretic Issue 265] *Error when loading gemma-4-31b-it model.* GitHub issue, p-e-w/heretic#265, 2025. https://github.com/p-e-w/heretic/issues/265
-- [Mlabonne 2024] Labonne, M. *Uncensor any LLM with abliteration.* HuggingFace blog, 2024. https://huggingface.co/blog/mlabonne/abliteration
-- [p-e-w 2025] p-e-w. *Heretic: Fully automatic censorship removal for language models.* GitHub, 2025. https://github.com/p-e-w/heretic
-- [p-e-w 2025b] p-e-w. *Arbitrary-Rank Ablation (ARA), Pull Request #211.* GitHub, p-e-w/heretic, 2025. https://github.com/p-e-w/heretic/pull/211
-- [Röttger 2024] Röttger, P., Kirk, H. R., Vidgen, B., Attanasio, G., Bianchi, F., Hovy, D. *XSTest: A Test Suite for Identifying Exaggerated Safety Behaviours in Large Language Models.* arXiv:2308.01263, August 2023; NAACL 2024. https://arxiv.org/abs/2308.01263
-- [TrevorS 2026] TrevorS. *gemma-4-abliteration: Gemma 4 abliteration research — biprojection + EGA for E2B, E4B, 26B MoE, 31B.* GitHub, 2026. https://github.com/TrevorS/gemma-4-abliteration
+*Bibliography consolidated in `paper/references.md`.*
