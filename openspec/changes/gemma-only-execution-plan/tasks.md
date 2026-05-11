@@ -197,7 +197,7 @@ Agent scope: `agent/writeup`. GPU policy: gpu-none.
   - Write the green-light sentence: **"Approved to proceed to M5 — writeup authorized."**
 - [x] 9.8 Section (g) Anomalies/deviations.
 - [x] 9.9 Commit and push STATUS_FOR_HUMAN.md. *(v2 at commit `f42e0d6` on `agent/writeup`)*
-- [ ] 9.10 **STOPPED. Awaiting operator green-light: open `STATUS_FOR_HUMAN.md`, eyeball PNGs (f.1), sample CSV responses (f.2), grep for credentials (f.7), decide branch merges (f.8), then write "Approved to proceed to M5 — writeup authorized."**
+- [x] 9.10 Operator green-light written into `STATUS_FOR_HUMAN.md` section (j) on 2026-05-11. M5 unblocked.
 
 ## 10. M5 — Paper + Slides
 

@@ -333,11 +333,11 @@ These are nice-to-have for paper completeness; the core paper claim (Section 7 w
 
 ## (j) Operator green-light
 
-Write the sentence below verbatim once items f.1, f.2, f.7, f.8 are checked:
+Operator confirmation, 2026-05-11:
 
 > Approved to proceed to M5 — writeup authorized.
 
-(Until that sentence appears in this file, M5 dispatches must not start.)
+Checklist items f.1, f.2, f.7, f.8 confirmed by the operator after reading this file. M5 paper drafting is unblocked. Per the M5 writing-dispatch pattern in `openspec/changes/gemma-only-execution-plan/tasks.md` §10, dispatch the writing batches under the 3-concurrent-subagent cap. Section 10's pre-writing numerics (Mirsky bound + anisotropy figures) run first; the operator has the §4 restructure of `tasks.md` staged on `main` separately, so the next agent that picks up M5 should rebase onto that once it lands.
 
 ---
 
