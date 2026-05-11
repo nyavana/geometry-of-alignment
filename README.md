@@ -9,6 +9,12 @@ fragile that a single rank-1 weight perturbation can eliminate it, and whether
 selective de-alignment (removing over-refusal while keeping genuine safety) is
 possible.
 
+## Project Website
+
+V1 of the project landing page is live at **<https://geometry-of-alignment.vercel.app>**.
+
+Source for the site is in [`website/`](website/) — a single self-contained `index.html` plus six published figures from `results/figures/`. Deploy with `cd website && vercel --prod`. See [`website/README.md`](website/README.md) for details.
+
 ## Research Questions
 
 1. **How prevalent is over-refusal in practice?** When do aligned models
@@ -189,9 +195,9 @@ Experimental work for the EECS 6699 final project is complete (M0–M4 + M6);
 paper write-up (M5) is in progress (section 8 drafted; sections 1, 4, 5, 6,
 7, 9 pending). See `STATUS_FOR_HUMAN.md` at the repo root for the
 operator-review status doc with all headline numbers, figure paths, and
-verification checklist; `docs/M6_PROPOSAL_RANK1_FOLLOWUP.md` for the M6
-cascade design + per-stage results; `docs/project_plan.md` for the original
-execution plan; `docs/project_proposal.md` for the original proposal.
+verification checklist; `docs/findings/M6_PROPOSAL_RANK1_FOLLOWUP.md` for the M6
+cascade design + per-stage results; `docs/planning/project_plan.md` for the original
+execution plan; `docs/planning/project_proposal.md` for the original proposal.
 
 ### Headline findings
 
@@ -241,7 +247,7 @@ execution plan; `docs/project_proposal.md` for the original proposal.
   not a strong feature of the Gemma 4 family on this benchmark.
 
 See `STATUS_FOR_HUMAN.md` (b) for the full benchmark table and (h) for
-paper-grade headline numbers; `docs/M6_PROPOSAL_RANK1_FOLLOWUP.md` §7 and
+paper-grade headline numbers; `docs/findings/M6_PROPOSAL_RANK1_FOLLOWUP.md` §7 and
 `paper/sections/08_rank1_cascade.md` for the M6 cascade.
 
 ## License
