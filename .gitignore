@@ -140,6 +140,7 @@ runs/
 .claude/
 .codex
 .codex/
+.superpowers/
 
 # =============================================================================
 # OS / shell artifacts
