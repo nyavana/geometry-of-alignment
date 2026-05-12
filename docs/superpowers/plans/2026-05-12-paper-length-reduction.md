@@ -17,6 +17,8 @@
 - For prose cuts, work directly from the original section files via `Read` and `Edit` against the new copy in `paper/short/`. Do not modify `paper/sections/*.md` or `paper/paper.md`.
 - Each task ends with a commit. Use `feat(short):`, `refactor(short):`, etc. prefixes; conventional-commits format matches the repo.
 - "Headline numerics" list, preserve verbatim across all cuts: `42 / 42`, `1 / 50`, `6 / 50`, `18 / 42`, `Cohen's *d* = 2.87`, `86.6 %`, `17 / 42`, `40.5 %`, `median rank_95 = 6`, `~201`, `84`, `−0.08`, `0.04`, `≈ 0.96`, `+0.93`, `−0.015`, `2560`.
+- **Figure-link convention.** Section files live at `paper/short/0N_*.md`, the assembled file at `paper/short/paper_short.md`. Both resolve a figure path `../../results/figures/foo.png` to `results/figures/foo.png` from the repo root. Always write figure links in that form. Do NOT use a repo-root-relative `results/figures/foo.png` in the markdown — it renders fine in some tools but breaks others.
+- **Citation truth set.** The canonical bibliography is `paper/references.md`. Before drafting any section that introduces a new citation, scan that file for the exact key. The linear-representation / representation-engineering literature uses `[Park 2023]` and `[Zou 2023]` (no `[Mikolov]`, no `[Park 2024]`); the standard reference-engineering citation chain is `[Park 2023]` → `[Zou 2023]` → `[Arditi 2024]`.
 
 ---
 
@@ -162,7 +164,7 @@ git commit -m "feat(short): 01_introduction — drop preview/math/roadmap, tight
 
 **What to keep:**
 - From `02_background.md` §1 "Foundational Alignment" (lines 5–17): compress to ~250w. One paragraph covering RLHF → DPO → Constitutional AI as the standard pipeline that installs refusal behavior. Cite [Christiano 2017], [Ouyang 2022], [Rafailov 2023], [Bai 2022] inline.
-- From `02_background.md` §2 "Linear Representations" (lines 19–35): compress to ~250w. State the linear-representation hypothesis and how it justifies the mean-difference direction estimator. Cite [Mikolov 2013], [Park 2024].
+- From `02_background.md` §2 "Linear Representations" (lines 19–35): compress to ~250w. State the linear-representation hypothesis and how it justifies the mean-difference direction estimator. Cite [Park 2023] and [Zou 2023] (the canonical bibliography keys — do NOT use `[Mikolov 2013]` or `[Park 2024]`; neither exists in `paper/references.md`).
 - From `03_related_work.md` §1 "The Abliteration Lineage" (lines 5–17): compress to ~400w. Anchor on Arditi 2024 and Mlabonne 2024; one sentence each on [p-e-w 2025], [elder-plinius 2025], [grimjim 2025], [TrevorS 2026] as the published variants. Drop the variant-by-variant pedagogical walkthrough.
 - From `03_related_work.md` §2 "Over-Refusal: Why the Question Matters" (lines 19–27): compress to ~250w. [Röttger 2024]/XSTest and [Cui 2024]/OR-Bench. Drop tutorial discussion of why over-refusal is a problem (intro carries that).
 - From `03_related_work.md` §3 "Gemma 4 Architectural Quirks" (lines 29–45): compress to ~300w. Local/global attention split, RMSNorm placement, shared K/V tensors in layers 24–41. These bear on §4.3 so they must stay.
@@ -212,8 +214,24 @@ Expected: 1,550–2,050.
 
 - [ ] **Step 4: Citation audit**
 
-Run: `grep -oE "\\[(Arditi|Mlabonne|Röttger|Cui|p-e-w|elder-plinius|grimjim|TrevorS|Christiano|Ouyang|Rafailov|Bai|Mikolov|Park) [0-9]{4}" paper/short/02_background_related.md | sort | uniq`
-Expected: at least Arditi 2024, Mlabonne 2024, Röttger 2024, Cui 2024, elder-plinius 2025, TrevorS 2026 (these are load-bearing for later sections). Missing any → restore.
+Use a literal-bracket extractor rather than a hand-written name regex (some keys contain spaces like `Gemma Team`, hyphens like `p-e-w`, non-ASCII like `Röttger`, and non-year formats like `Heretic Issue 265`):
+
+```bash
+grep -oE "\[[^]]+\]" paper/short/02_background_related.md \
+  | grep -vE "^\[(http|//|#|results/|\.\./|\\^|\\\\)" \
+  | sort -u
+```
+
+Expected: the list contains at least `[Arditi 2024]`, `[Mlabonne 2024]`, `[Röttger 2024]`, `[Cui 2024]`, `[elder-plinius 2025]`, `[TrevorS 2026]`, `[Park 2023]`, `[Zou 2023]`, `[Gemma Team 2025]` (load-bearing for later sections). Each appearing key must exist as a `**[Key]**` bullet in `paper/references.md` — verify with:
+
+```bash
+# every cited key from §2 should appear in references.md
+comm -23 \
+  <(grep -oE "\[[^]]+\]" paper/short/02_background_related.md | grep -vE "^\[(http|//|#|results/|\.\./)" | sort -u) \
+  <(grep -oE "\*\*\[[^]]+\]\*\*" paper/references.md | sed 's/\*\*//g' | sort -u)
+```
+
+Expected: empty output (no cited key is missing from references). If non-empty, either the citation is wrong or the key needs to be the canonical one — fix in the draft, not in references.md.
 
 - [ ] **Step 5: Commit**
 
@@ -279,11 +297,15 @@ The empirical sections cite three results from matrix-perturbation theory and hi
 
 Embed exactly one figure reference: `![Mirsky bound, per-layer relative perturbation](../../results/figures/mirsky_bound_heatmap_d3.png)` inside §3.2. (Path is relative to `paper/short/`. Double-check the path resolves before committing.)
 
-- [ ] **Step 3: Verify the figure path resolves**
+- [ ] **Step 3: Verify the figure path resolves from `paper/short/`**
 
-Run: `ls paper/../results/figures/mirsky_bound_heatmap_d3.png`
-Expected: file listed.
-If the path doesn't resolve from where the markdown will be read, adjust to `../../results/figures/mirsky_bound_heatmap_d3.png` or whichever form works for the eventual renderer. The existing `paper/paper.md` uses `results/figures/...` from the repo root — match that convention.
+The figure link in `03_math_tools.md` should be exactly `![...](../../results/figures/mirsky_bound_heatmap_d3.png)`. Verify it resolves from where the markdown file lives:
+
+```bash
+(cd paper/short && [ -f ../../results/figures/mirsky_bound_heatmap_d3.png ] && echo "OK" || echo "MISSING")
+```
+
+Expected: `OK`. If `MISSING`, the figure path is wrong — fix it before continuing. Do NOT use a repo-root-relative `results/figures/...` link, even though that renders in some tools, because it breaks others.
 
 - [ ] **Step 4: Word-count check**
 
@@ -312,7 +334,7 @@ git commit -m "feat(short): 03_math_tools — fold §4 + §9.1 into tool+applica
 - Target for §4.1: ~900w
 
 **What to keep:**
-- Headline refusal-rate numbers (E4B refuses 42/42 should_refuse, 1/50 emergency_medical; +emergency-responder-framing nudges to 2/50; E2B refuses 6/50 emergency_medical and 18/42 gray_zone). Currently in §5.2 (lines 22–42).
+- Headline refusal-rate numbers (E4B refuses 42/42 should_refuse, 1/50 emergency_medical; E2B refuses 6/50 emergency_medical and 18/42 gray_zone). Currently in §5.2 (lines 22–42). The emergency-responder-framing probe is a separate single-category probe on emergency_medical only (1/50 → 2/50); state it in one sentence after the main table — do NOT add a responder column to the table, which would invent data for categories the probe never ran on.
 - The framing-pivot narrative (paper rerouted from over-refusal mitigation to geometry). Currently in §5.6 (lines 68–76).
 - One compact summary table replacing per-category walkthrough.
 
@@ -342,17 +364,23 @@ This section reports the four findings F1–F4 in the same order as the abstract
 <close with one paragraph on the framing pivot>
 ```
 
-The summary table should look like (approximate numbers, fill from source):
+The summary table should look like (numbers from `paper/sections/05_over_refusal.md` §5.2 table, lines 26–31 — verify each cell before committing):
 
 ```markdown
-| Category (n) | E2B | E4B | E4B + responder framing |
-|---|---:|---:|---:|
-| should_refuse (42) | 42 / 42 (100%) | 42 / 42 (100%) | 42 / 42 (100%) |
-| emergency_medical (50) | 6 / 50 (12%) | 1 / 50 (2%) | 2 / 50 (4%) |
-| gray_zone (42) | 18 / 42 (43%) | (fill from source) | — |
+| Category (n) | E2B base | E4B base |
+|---|---:|---:|
+| should_refuse (42) | 40 / 42 (95.2%) | 42 / 42 (100%) |
+| emergency_medical (50) | 6 / 50 (12.0%) | 1 / 50 (2.0%) |
+| gray_zone (42) | 18 / 42 (42.9%) | 4 / 42 (9.5%) |
+| mental_health (40) | 1 / 40 (2.5%) | 0 / 40 (0.0%) |
+| chemistry_safety (40) | 2 / 40 (5.0%) | 0 / 40 (0.0%) |
+| wilderness_survival (50) | 9 / 50 (18.0%) | 1 / 50 (2.0%) |
+| home_safety (40) | 1 / 40 (2.5%) | 1 / 40 (2.5%) |
+| safe_control (40) | 0 / 40 (0%) | 0 / 40 (0%) |
+| TOTAL (344) | 77 / 344 (22.4%) | 49 / 344 (14.2%) |
 ```
 
-Verify each cell against `paper/sections/05_over_refusal.md` before committing.
+After the table, in one sentence: *"An emergency-responder-framing probe (prepending 'I am an emergency first responder' to the 50 emergency_medical prompts on base E4B) moved that single category from 1 / 50 to 2 / 50; the probe was not run on other categories and we make no claim about them."*
 
 - [ ] **Step 3: Word-count check on §4.1**
 
@@ -387,7 +415,12 @@ git commit -m "feat(short): 04_findings §4.1 — F1 over-refusal pivot, summary
 - Activation-hooking method gloss (one paragraph, not the methodology walkthrough). From `06_mechanistic.md` §1 (lines 7–22).
 - Per-layer signal-strength scan, the L15 peak, Cohen's *d* = 2.87. From `06_mechanistic.md` §2 (lines 24–36).
 - The rank-1 PCA result: top PC captures 86.6% of squared-norm difference. From `06_mechanistic.md` §3 (lines 38–46).
-- The standard-recipe self-abliteration negative result: still 100% should_refuse refusal across α-sweep [0, 2.0] and 7-subset layer partition, statistically indistinguishable from random-direction control. From `07_abliteration_weight_diff.md` §7.2 (lines 15–29) and `05_over_refusal.md` §5.3.
+- The standard-recipe self-abliteration negative result, stated precisely (the source draws a careful distinction between the sweep and the head-to-head):
+  - **α-sweep:** refusal rate flat at 30–35% across α ∈ {0.0, 0.1, 0.3, 0.5, 0.7, 1.0, 1.2, 1.5, 2.0} on a stratified n=20 subsample.
+  - **Layer-subset sweep:** flat at 25–35% across **nine** partitions (all_42, global_only, sliding_only, first_half, second_half, last_10, middle_14, peak_band_4_17, peak_layer_15_only) at α=1.0 on the same n=20.
+  - **Random-direction control:** 30%, indistinguishable from α=0.
+  - **Direct n=48 head-to-head on should_refuse:** self-abliterated 6/6 = 100%, base 42/42 = 100%, **delta = 0 percentage points**.
+  Source: `07_abliteration_weight_diff.md` §7.2 (lines 15–29) and `05_over_refusal.md` §5.3 (lines 44–52). The sweep number and the head-to-head number are different evaluations; keep them distinct in the prose.
 - Embed two figures: `signal_vs_layer.png` and `pca_variance_per_layer.png`.
 
 **What to drop:**
@@ -404,7 +437,7 @@ Use `Read` on `paper/sections/06_mechanistic.md` (80 lines) and `paper/sections/
 
 ```markdown
 ### 4.2 F2 — Refusal is rank-1 in activations but doesn't budge under the standard recipe
-<~1,200w covering: activation extraction (one paragraph), per-layer signal scan with L15 peak and Cohen's d = 2.87, rank-1 PCA with 86.6% top-PC variance, then the negative behavioral result — standard rank-1 mean-difference abliteration leaves should_refuse at 100% across the α-sweep and the 7-subset layer partition, indistinguishable from random-direction control>
+<~1,200w covering: activation extraction (one paragraph), per-layer signal scan with L15 peak and Cohen's d = 2.87, rank-1 PCA with 86.6% top-PC variance, then the negative behavioral result. State the sweep and the head-to-head as separate evidence — α-sweep [0, 2.0] flat at 30–35% on a stratified n=20 subsample; 9-partition layer-subset sweep flat at 25–35% on the same subset; random-direction control at 30%, indistinguishable from α=0; a separate direct n=48 head-to-head against base on should_refuse registered self-abliterated 6/6 = 100% vs. base 42/42 = 100%, delta = 0.>
 
 ![Per-layer signal strength, refuse vs comply](../../results/figures/signal_vs_layer.png)
 
@@ -418,8 +451,8 @@ Expected: ~2,000–2,200 (previous ~900 + new ~1,200).
 
 - [ ] **Step 4: Numerics audit**
 
-Run: `grep -oE "L15|Cohen|2\\.87|86\\.6|α-sweep|7-subset|random-direction" paper/short/04_findings.md | sort | uniq -c`
-Expected: each term present.
+Run: `grep -oE "L15|Cohen|2\\.87|86\\.6|α-sweep|9.partition|nine.partition|random-direction|6 / 6|42 / 42|n.=.48|n.=.20" paper/short/04_findings.md | sort | uniq -c`
+Expected: each term present at least once. Specifically, both the sweep numbers (`30–35%`, `25–35%`, `n=20`) and the head-to-head numbers (`6 / 6`, `42 / 42`, `n=48`) must appear, and the partition count is **nine**, not seven.
 
 - [ ] **Step 5: Commit**
 
@@ -490,14 +523,16 @@ git commit -m "feat(short): 04_findings §4.3 — F4 cross-method weight-diff or
 
 ---
 
-## Task 5d: §4.4 F3 — Causal-isolation cascade with H4 partial
+## Task 5d: §4.4 F3 — Causal-isolation cascade with the D3 stacked partial
 
 **Files:**
 - Modify: `paper/short/04_findings.md` (append §4.4)
-- Source: `paper/sections/08_rank1_cascade.md` (2,334 words, four subsections)
+- Source: `paper/sections/08_rank1_cascade.md` (2,334 words, four subsections); confirm phrasing against `paper/sections/07_abliteration_weight_diff.md:35`
 - Target for §4.4: ~1,500w
 
-This is the experimental contribution and gets the smallest relative cut. H4 keeps full treatment; H1, H2, H3, H5 collapse to one combined paragraph.
+This is the experimental contribution and gets the smallest relative cut. The D3 stacked variant (H2 + H3 + H4) keeps full treatment; H1, H2, H3, H5 collapse to one combined paragraph.
+
+**Critical phrasing constraint.** The source explicitly disclaims a "sufficient" claim for H4 alone (`07_abliteration_weight_diff.md:35`): *"D3 ... is necessary in combination with prior ingredients to produce the partial 40.5% result; we do not claim sufficient — Stage 2.5 unstacked isolation was not run, so we cannot rule out the possibility that the chat-template step (D1) or the winsorization step (D2) is doing the real work on its own and the Gram-Schmidt layer is decorative."* The new §4.4 prose **must preserve this nuance.** Frame the result as "the D3 stacked variant (chat-template + winsorize + Gram-Schmidt against harmless mean) is the **smallest stacked variant that produces the partial 40.5% effect**; unstacked isolation of each ingredient was not run, so we do not claim Gram-Schmidt is individually sufficient." Do not write "isolates Gram-Schmidt as load-bearing" or "the load-bearing ingredient is H4" — those overclaim.
 
 **What to keep, full treatment:**
 - §1 "Setup and the negative-finding starting point" (lines 5–9). Compress to ~150w.
@@ -519,23 +554,23 @@ Use `Read` on `paper/sections/08_rank1_cascade.md` (54 lines).
 - [ ] **Step 2: Append §4.4 to `paper/short/04_findings.md`**
 
 ```markdown
-### 4.4 F3 — A causal-isolation cascade isolates Gram-Schmidt as the load-bearing ingredient
+### 4.4 F3 — A causal-isolation cascade identifies D3 as the smallest stacked variant that moves the gate
 <~150w setup recapping §4.2's null and the question it raised>
 
 #### Hypothesis taxonomy
 <~200w compact table or bullet list listing H1 (bnb int8), H2 (chat-template direction), H3 (winsorization), H4 (Gram-Schmidt against harmless mean), H5 (norm-preserving biprojection), with one-clause descriptions>
 
 #### What was ruled out
-<~150w combined paragraph — one sentence each for H1, H2, H3, H5 with what was tested and what it showed>
+<~150w combined paragraph — one sentence each for H1, H2, H3, H5 with what was tested and what it showed. H1 (bnb int8 in-place edit): the bf16 edit path reproduces the int8 failure character-for-character, ruling out quantization. H2 (chat-template direction alone): not tested unstacked. H3 (winsorization alone): not tested unstacked. H5 (norm-preserving biprojection): vanilla projection changes per-row L2 norms by mean 0.038%, well below the threshold at which RMSNorm sensitivity would plausibly drift, so H5 is not needed.>
 
-#### H4 — Gram-Schmidt against the harmless mean
-<~600w full treatment: the D3 variant; 17/42 = 40.5% should_refuse refusal at α = 1.0 across all 42 layers; residual concentrates on extreme topics (CSAM, ICS/hospital malware, weapons); per-prompt breakdown if it fits in word budget; embed m6_cascade_gate.png and m6_perprompt_n42.png>
+#### D3 — the smallest stacked variant that moves the gate
+<~600w full treatment, with the source's careful phrasing preserved. The D3 stacked variant = chat-template direction (D1) + per-layer winsorization at 99.5% (D2) + two-pass Gram-Schmidt against the harmless mean (D3). Applied via the same vanilla rank-1 projection at α=1.0 across all 42 layers as §4.2. Result: 17/42 = 40.5% should_refuse refusal at n=42, down from base 42/42 = 100%. Residual concentrates on extreme topics (CSAM, ICS/hospital malware, weapons). State explicitly: *"D3 is necessary in combination with prior ingredients to produce the partial 40.5% result; we do not claim sufficient — Stage 2.5 unstacked isolation was not run, so we cannot rule out the possibility that D1 or D2 is doing the real work and the Gram-Schmidt layer is decorative."* Per-prompt breakdown if word budget permits.>
 
 ![Cascade gate](../../results/figures/m6_cascade_gate.png)
 ![Per-prompt n=42](../../results/figures/m6_perprompt_n42.png)
 
 #### Implications
-<~250w — "partial first-order behavioral response under small rank-1 perturbation, consistent with §3.2's Mirsky-bound prediction. Residual ≈ 60% indicates the refusal manifold is not fully one-dimensional in weight space on Gemma 4, even when it is in activation space (§4.2)">
+<~250w — "partial first-order behavioral response under small rank-1 perturbation, consistent with §3.2's Mirsky-bound prediction. Residual ≈ 60% indicates the refusal manifold is not fully one-dimensional in weight space on Gemma 4, even when it is in activation space (§4.2). We characterize D3 as the smallest stacked direction-build recipe that produces the partial effect; we make no claim about which individual ingredient is load-bearing.">
 ```
 
 - [ ] **Step 3: Word-count delta check**
@@ -665,19 +700,24 @@ Expected: silent success.
 
 - [ ] **Step 2: Build the list of citation keys actually used in the new paper**
 
-Run:
+Use a literal-bracket extractor — citation keys include multi-word keys (`[Gemma Team 2025]`), accented characters (`[Röttger 2024]`), and non-year keys (`[Heretic Issue 265]`) that a `[A-Za-z]+ [0-9]{4}` regex would miss. Filter out non-citation brackets:
+
 ```bash
-grep -hoE "\\[[A-Za-z][A-Za-z-]+ [0-9]{4}[a-z]?\\]" paper/short/0[0-5]*.md | sort -u > /tmp/cited_keys.txt
+grep -hoE "\[[^]]+\]" paper/short/0[0-5]*.md \
+  | grep -vE "^\[(http|//|#|\.\./|\^|\\\\|results/)" \
+  | sort -u > /tmp/cited_keys.txt
 wc -l /tmp/cited_keys.txt
 cat /tmp/cited_keys.txt
 ```
-Expected: a sorted list of `[Author Year]` keys, ~15–25 entries.
+Expected: a sorted list of citation keys (~15–25 entries).
 
 - [ ] **Step 3: Build the list of citation keys defined in references.md**
 
 Run:
 ```bash
-grep -oE "\\*\\*\\[[A-Za-z][A-Za-z-]+ [0-9]{4}[a-z]?\\]\\*\\*" paper/short/references.md | sed 's/\\*\\*//g' | sort -u > /tmp/defined_keys.txt
+grep -oE "\*\*\[[^]]+\]\*\*" paper/short/references.md \
+  | sed 's/\*\*//g' \
+  | sort -u > /tmp/defined_keys.txt
 wc -l /tmp/defined_keys.txt
 ```
 Expected: a longer list than cited (orphans exist).
@@ -828,22 +868,44 @@ Expected: `00_abstract.md  01_introduction.md  02_background_related.md  03_math
 
 Run:
 ```bash
-for pattern in "42 / 42" "1 / 50" "Cohen's \\*d\\* = 2\\.87" "86\\.6" "17 / 42" "40\\.5" "rank_95 = 6" "~201" "−0\\.08" "0\\.04"; do
+for pattern in "42 / 42" "1 / 50" "Cohen's \\*d\\* = 2\\.87" "86\\.6" "17 / 42" "40\\.5" "rank_95 = 6" "~201" "−0\\.08" "0\\.04" "6 / 6" "30–35%" "25–35%"; do
   count=$(grep -cE "$pattern" paper/short/paper_short.md)
   echo "$pattern : $count"
 done
 ```
 Expected: every count ≥ 1. If any is 0, the cut lost a load-bearing number — restore from the original section file.
 
-- [ ] **Step 4: Figure-path audit**
+- [ ] **Step 4: Figure-path audit (markdown-relative)**
 
-Run:
+The links in `paper/short/paper_short.md` should be of the form `../../results/figures/foo.png` — relative to the markdown file's location. Resolve them relative to `paper/short/` (where the file lives), not relative to the repo root:
+
 ```bash
-grep -oE "results/figures/[a-z0-9_.-]+\\.(png|md)" paper/short/paper_short.md | sort -u | while read f; do
-  if [ ! -f "$f" ]; then echo "MISSING: $f"; fi
-done
+(
+  cd paper/short
+  # extract every image-link target inside markdown image syntax
+  grep -oE "\!\[[^]]*\]\([^)]+\)" paper_short.md \
+    | sed -E 's/.*\(([^)]+)\).*/\1/' \
+    | while read -r rel; do
+        if [ ! -f "$rel" ]; then
+          echo "MISSING (resolved from paper/short/): $rel"
+        fi
+      done
+)
 ```
-Expected: no `MISSING:` lines. Each figure path must resolve to an existing file in `results/figures/`.
+
+Expected: no `MISSING` lines.
+
+Also flag the wrong-form case — a repo-root-relative `results/figures/...` written without the `../../` prefix renders correctly in some tools and breaks in others; reject either form mismatch:
+
+```bash
+# any image-link that doesn't start with ../../results/figures/ is suspect
+grep -oE "\!\[[^]]*\]\([^)]+\)" paper/short/paper_short.md \
+  | sed -E 's/.*\(([^)]+)\).*/\1/' \
+  | grep -vE "^\.\./\.\./results/figures/" \
+  | grep -vE "^https?://" \
+  || echo "(no non-conforming links)"
+```
+Expected: `(no non-conforming links)`. If any link is printed, rewrite it to the `../../results/figures/...` form.
 
 - [ ] **Step 5: Section-level word counts**
 
@@ -861,17 +923,30 @@ If any single section is more than 30% off its target and reads bloated, do one 
 
 - [ ] **Step 6: Orphan-reference audit**
 
-Run:
+Use literal-bracket extraction (handles multi-word keys like `[Gemma Team 2025]`, accented characters like `[Röttger 2024]`, and non-year keys like `[Heretic Issue 265]`). Filter out non-citation brackets (URLs, anchors, paths, math notation):
+
 ```bash
-grep -hoE "\\[[A-Za-z][A-Za-z-]+ [0-9]{4}[a-z]?\\]" paper/short/0[1-5]*.md | sort -u > /tmp/cited.txt
-grep -oE "\\*\\*\\[[A-Za-z][A-Za-z-]+ [0-9]{4}[a-z]?\\]\\*\\*" paper/short/references.md | sed 's/\\*\\*//g' | sort -u > /tmp/defined.txt
+# cited keys — from all prose sections (not references.md itself)
+grep -hoE "\[[^]]+\]" paper/short/0[1-5]*.md \
+  | grep -vE "^\[(http|//|#|\.\./|\^|\\\\|results/)" \
+  | sort -u > /tmp/cited.txt
+
+# defined keys — bullets in references.md of the form `- **[Key]** ...`
+grep -oE "\*\*\[[^]]+\]\*\*" paper/short/references.md \
+  | sed 's/\*\*//g' \
+  | sort -u > /tmp/defined.txt
+
 comm -23 /tmp/defined.txt /tmp/cited.txt > /tmp/orphans.txt
 comm -23 /tmp/cited.txt /tmp/defined.txt > /tmp/missing.txt
-echo "Orphans: $(wc -l < /tmp/orphans.txt)"
-echo "Missing: $(wc -l < /tmp/missing.txt)"
+echo "Orphans (defined but not cited):"
+cat /tmp/orphans.txt
+echo "Missing (cited but not defined):"
 cat /tmp/missing.txt
 ```
-Expected: Orphans = 0, Missing = 0. If Missing > 0, those keys must be added to `references.md` (copy from the original `paper/references.md`).
+
+Expected: `/tmp/missing.txt` is empty. `/tmp/orphans.txt` should be empty after Task 7's prune pass; if non-empty, run Task 7 Step 5 again on the residual orphans.
+
+If `/tmp/missing.txt` is non-empty, those keys must either be added to `paper/short/references.md` (copy the matching `- **[Key]** ...` bullet from `paper/references.md`) or the citation in the prose was wrong (fix it to use the canonical key — see operating notes for the `[Park 2023]` / `[Zou 2023]` examples).
 
 - [ ] **Step 7: Final summary commit (if any clean-up was needed)**
 
