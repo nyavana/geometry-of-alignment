@@ -1,0 +1,23 @@
+{
+  "mean_pairwise_cos_L15": 0.958575,
+  "centered_std_L15": 0.014042,
+  "uncentered_std_L15": 0.014042,
+  "isotropic_std_reference": 0.019764,
+  "anisotropy_ratio": 0.7105,
+  "median_abs_cos_learned_directions": 0.978216,
+  "frac_energy_on_d_refuse_mean": 0.012151,
+  "frac_energy_on_d_comply_mean": 0.010467,
+  "N_refuse": 262,
+  "N_comply": 40,
+  "mean_pairwise_cos_shift_from_zero": 0.958575,
+  "mean_shift_in_isotropic_std_units": 48.5,
+  "_direction_integrity_cos_diff_d": 1.0,
+  "_cos_mean_refuse_comply": 0.9843,
+  "_layer": 15,
+  "_note_safe_control_equals_comply": true,
+  "_note_cos_mean_refuse_d": 0.0809,
+  "_note_cos_mean_refuse_d_explanation": "Small value is expected and correct: d=normalize(mean_refuse-mean_comply), and cos(mean_refuse,mean_comply)=0.984, so both absolute mean vectors are nearly parallel; d is nearly orthogonal to both.",
+  "_n_pairwise_pairs": 28680,
+  "_n_refuse_sample_anisotropy": 200,
+  "_n_comply_sample_anisotropy": 40
+}
